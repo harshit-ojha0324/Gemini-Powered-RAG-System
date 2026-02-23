@@ -1,0 +1,40 @@
+version: '3.8'
+
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - GEMINI_MODEL=models/gemini-2.0-flash-exp
+      - CHROMA_PERSIST_DIRECTORY=/app/data/vectorstore
+      - DOCUMENTS_DIRECTORY=/app/data/documents
+      - LOGS_DIRECTORY=/app/data/logs
+    volumes:
+      - ./data:/app/data
+      - ./backend:/app
+    command: uvicorn app:app --host 0.0.0.0 --port 8000 --reload
+    networks:
+      - app-network
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    command: npm run dev -- --host
+    depends_on:
+      - backend
+    networks:
+      - app-network
+
+networks:
+  app-network:
+    driver: bridge

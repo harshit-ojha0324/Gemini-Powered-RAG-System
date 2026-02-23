@@ -1,0 +1,235 @@
+from fastapi import FastAPI, UploadFile, File, HTTPException, BackgroundTasks
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+from pydantic import BaseModel
+from typing import List, Optional
+import os
+import shutil
+from datetime import datetime
+import json
+from pathlib import Path
+
+from agents.rag_agent import RAGAgent
+from security.pii_detector import PIIDetector
+from security.input_validator import InputValidator
+from security.content_filter import ContentFilter
+from services.document_processor import DocumentProcessor
+from services.vectorstore import VectorStoreService
+
+app = FastAPI(title="Smart Document Q&A Agent", version="1.0.0")
+
+# CORS middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:5173", "http://localhost:3000"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# Initialize services
+rag_agent = RAGAgent()
+pii_detector = PIIDetector()
+input_validator = InputValidator()
+content_filter = ContentFilter()
+document_processor = DocumentProcessor()
+vectorstore_service = VectorStoreService()
+
+# Ensure directories exist
+Path("./data/documents").mkdir(parents=True, exist_ok=True)
+Path("./data/logs").mkdir(parents=True, exist_ok=True)
+
+# Request/Response Models
+class QueryRequest(BaseModel):
+    question: str
+    conversation_history: Optional[List[dict]] = []
+
+class QueryResponse(BaseModel):
+    answer: str
+    sources: List[dict]
+    security_warnings: List[str]
+    metadata: dict
+
+# Global stats
+stats = {
+    "total_queries": 0,
+    "total_documents": 0,
+    "security_incidents": 0,
+    "pii_detections": 0
+}
+
+def log_security_incident(query: str, flags: List[str], pii_found: bool):
+    """Log security incidents to file"""
+    log_entry = {
+        "timestamp": datetime.now().isoformat(),
+        "query": query,
+        "flags": flags,
+        "pii_detected": pii_found
+    }
+    
+    try:
+        log_file = Path("./data/logs/security_log.jsonl")
+        log_file.parent.mkdir(parents=True, exist_ok=True)
+        with open(log_file, "a") as f:
+            f.write(json.dumps(log_entry) + "\n")
+    except Exception:
+        pass  # Don't let logging failures break the request
+    
+    stats["security_incidents"] += 1
+    if pii_found:
+        stats["pii_detections"] += 1
+
+@app.get("/")
+async def root():
+    return {"message": "Smart Document Q&A Agent API", "status": "running"}
+
+@app.post("/api/upload")
+async def upload_document(file: UploadFile = File(...)):
+    """Upload and process a PDF document"""
+    try:
+        if not file.filename or not file.filename.endswith('.pdf'):
+            raise HTTPException(status_code=400, detail="Only PDF files are allowed")
+        
+        file_path = f"./data/documents/{file.filename}"
+        with open(file_path, "wb") as buffer:
+            shutil.copyfileobj(file.file, buffer)
+        
+        documents = document_processor.process_pdf(file_path)
+        vectorstore_service.add_documents(documents, file.filename)
+        
+        stats["total_documents"] += 1
+        
+        return {
+            "message": "Document uploaded and processed successfully",
+            "filename": file.filename,
+            "chunks": len(documents),
+            "status": "success"
+        }
+    
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error processing document: {str(e)}")
+
+@app.post("/api/query", response_model=QueryResponse)
+async def query_documents(request: QueryRequest):
+    """Query documents with security checks"""
+    try:
+        stats["total_queries"] += 1
+        security_warnings = []
+        
+        validation_result = input_validator.validate(request.question)
+        if not validation_result["is_valid"]:
+            security_warnings.extend(validation_result["warnings"])
+            log_security_incident(request.question, validation_result["warnings"], False)
+        
+        pii_result = pii_detector.detect(request.question)
+        if pii_result["has_pii"]:
+            security_warnings.append(f"PII detected: {', '.join(pii_result['types'])}")
+            log_security_incident(request.question, ["PII_DETECTED"], True)
+        
+        if any(w.startswith("INJECTION") for w in security_warnings):
+            raise HTTPException(status_code=400, detail="Query blocked due to security concerns")
+        
+        result = rag_agent.query(request.question, request.conversation_history)
+        filtered_answer = content_filter.filter(result["answer"])
+        
+        return QueryResponse(
+            answer=filtered_answer,
+            sources=result["sources"],
+            security_warnings=security_warnings,
+            metadata={
+                "query_time": datetime.now().isoformat(),
+                "model": "gemini-2.0-flash-exp",
+                "chunks_retrieved": len(result["sources"])
+            }
+        )
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error processing query: {str(e)}")
+
+@app.get("/api/documents")
+async def list_documents():
+    """List all uploaded documents"""
+    try:
+        docs_dir = Path("./data/documents")
+        documents = [
+            {
+                "filename": f.name,
+                "size": f.stat().st_size,
+                "uploaded_at": datetime.fromtimestamp(f.stat().st_mtime).isoformat()
+            }
+            for f in docs_dir.glob("*.pdf")
+        ]
+        return {"documents": documents, "count": len(documents)}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.delete("/api/documents/{filename}")
+async def delete_document(filename: str):
+    """Delete a document"""
+    try:
+        file_path = Path(f"./data/documents/{filename}")
+        if file_path.exists():
+            file_path.unlink()
+            vectorstore_service.delete_document(filename)
+            stats["total_documents"] -= 1
+            return {"message": "Document deleted successfully"}
+        else:
+            raise HTTPException(status_code=404, detail="Document not found")
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/stats")
+async def get_statistics():
+    """Get system statistics"""
+    actual_doc_count = len(list(Path("./data/documents").glob("*.pdf")))
+    return {
+        "statistics": {**stats, "total_documents": actual_doc_count},
+        "timestamp": datetime.now().isoformat()
+    }
+
+@app.get("/api/security/logs")
+async def get_security_logs(limit: int = 50):
+    """Get recent security logs"""
+    try:
+        log_file = Path("./data/logs/security_log.jsonl")
+        if not log_file.exists():
+            return {"logs": [], "count": 0}
+        
+        logs = []
+        with open(log_file, "r") as f:
+            for line in f:
+                logs.append(json.loads(line))
+        
+        logs = logs[-limit:]
+        logs.reverse()
+        
+        return {"logs": logs, "count": len(logs)}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/health")
+async def health_check():
+    """Health check endpoint"""
+    return {
+        "status": "healthy",
+        "timestamp": datetime.now().isoformat(),
+        "services": {
+            "rag_agent": "operational",
+            "vector_store": "operational",
+            "security": "operational"
+        }
+    }
+
+@app.post("/api/reset-embeddings")
+async def reset_embeddings():
+    """Reset to try Gemini embeddings again after quota reset"""
+    vectorstore_service.embeddings.reset_to_primary()
+    return {"message": "Reset to Gemini embeddings", "status": "success"}
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=8000)
