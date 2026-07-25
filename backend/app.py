@@ -122,14 +122,17 @@ async def query_documents(request: QueryRequest):
             log_security_incident(request.question, validation_result["warnings"], False)
         
         pii_result = pii_detector.detect(request.question)
+        safe_question = request.question
         if pii_result["has_pii"]:
-            security_warnings.append(f"PII detected: {', '.join(pii_result['types'])}")
-            log_security_incident(request.question, ["PII_DETECTED"], True)
+            # Redact detected PII so it reaches neither the audit log nor the LLM.
+            safe_question = pii_detector.redact(request.question)
+            security_warnings.append(f"PII detected and redacted: {', '.join(pii_result['types'])}")
+            log_security_incident(safe_question, ["PII_DETECTED"], True)
         
         if any(w.startswith("INJECTION") for w in security_warnings):
             raise HTTPException(status_code=400, detail="Query blocked due to security concerns")
         
-        result = rag_agent.query(request.question, request.conversation_history)
+        result = rag_agent.query(safe_question, request.conversation_history)
         filtered_answer = content_filter.filter(result["answer"])
         
         return QueryResponse(

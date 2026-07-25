@@ -1,6 +1,6 @@
 # LLM Document Agent
 
-A full-stack, production-ready **Retrieval-Augmented Generation (RAG)** application that lets you upload PDF documents and ask questions about them using Google Gemini AI. Built with enterprise-grade security features including PII detection, injection prevention, and real-time security monitoring.
+A full-stack **Retrieval-Augmented Generation (RAG)** application that lets you upload PDF documents and ask questions about them using Google Gemini AI. Built with enterprise-grade security features including PII detection, injection prevention, and real-time security monitoring.
 
 ---
 
@@ -58,7 +58,7 @@ Conversation history is maintained so you can ask follow-up questions naturally.
 - **Auto-generated API Docs** — Swagger UI at `/docs` and ReDoc at `/redoc`
 - **Docker Support** — One-command deployment with Docker Compose
 - **Makefile Shortcuts** — Common tasks available as `make` commands
-- **Comprehensive Test Suite** — Pytest with coverage reporting
+- **Test Suite** — Pytest with coverage reporting (note: three of the six backend test modules are still empty placeholder stubs)
 
 ---
 
@@ -218,7 +218,7 @@ All configuration is managed via environment variables. Copy `.env.example` to `
 | Variable | Default | Description |
 |---|---|---|
 | `GEMINI_API_KEY` | *(required)* | Your Google Gemini API key |
-| `GEMINI_MODEL` | `models/gemini-2.5-flash` | LLM model to use for generation |
+| `GEMINI_MODEL` | `models/embedding-001` | Gemini **embedding** model (the generation model is fixed to `gemini-2.0-flash` in `rag_agent.py`, not controlled by this variable) |
 | `CHROMA_PERSIST_DIRECTORY` | `./data/vectorstore` | Path to persist the Chroma vector DB |
 | `DOCUMENTS_DIRECTORY` | `./data/documents` | Path to store uploaded PDF files |
 | `LOGS_DIRECTORY` | `./data/logs` | Path to store security event logs |
