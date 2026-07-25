@@ -32,8 +32,9 @@ rag_agent = RAGAgent()
 pii_detector = PIIDetector()
 input_validator = InputValidator()
 content_filter = ContentFilter()
-document_processor = DocumentProcessor()
 vectorstore_service = VectorStoreService()
+# Share the vector store's embeddings so semantic chunking and indexing use one model.
+document_processor = DocumentProcessor(embeddings=vectorstore_service.embeddings)
 
 # Ensure directories exist
 Path("./data/documents").mkdir(parents=True, exist_ok=True)

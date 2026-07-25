@@ -28,7 +28,7 @@ A full-stack **Retrieval-Augmented Generation (RAG)** application that lets you 
 LLM Document Agent enables intelligent question-answering over your PDF documents. Upload any PDF, ask natural language questions, and get contextual answers grounded in your document content — with full source attribution showing which page the answer came from.
 
 The system uses a RAG pipeline:
-1. PDFs are parsed and split into overlapping text chunks
+1. PDFs are parsed and split into **semantically-coherent chunks** (sentences are embedded and split at topic-shift breakpoints, with a recursive-character fallback)
 2. Chunks are embedded into a vector database (Chroma) using Google Gemini embeddings
 3. At query time, semantically similar chunks are retrieved and passed to the LLM as context
 4. Gemini 2.0 Flash generates a grounded, accurate response
@@ -41,6 +41,7 @@ Conversation history is maintained so you can ask follow-up questions naturally.
 
 ### Core
 - **PDF Upload & Management** — Upload, list, and delete documents via a clean web UI
+- **Semantic Chunking** — Documents are split at embedding-distance topic shifts rather than fixed-size windows, so each chunk stays on one idea (`services/document_processor.py`)
 - **Semantic Search** — Vector similarity search over document chunks using Chroma
 - **RAG-Powered Q&A** — Contextual answers from Google Gemini, grounded in your documents
 - **Source Attribution** — Every answer links back to the source document and page number
@@ -293,6 +294,14 @@ All user queries pass through `InputValidator` before reaching the LLM:
 
 Flagged queries are blocked and logged before any LLM processing occurs.
 
+### Instruction Hierarchy
+
+The RAG prompt enforces an explicit instruction hierarchy: the system rules sit above the retrieved document context and the user question, both of which are wrapped in delimiters and treated as untrusted **data**, never as instructions. Injection-style text embedded in a document or question is to be reported, not obeyed — the in-prompt complement to the regex gate above (`agents/prompt_templates.py`).
+
+### PII Redaction
+
+Detected PII is redacted (`security/pii_detector.py`) before the query is written to the audit log or forwarded to Gemini, so raw PII never leaves the process. (Injection attempts are logged verbatim on purpose, for forensics.)
+
 ### PII Detection
 
 The `PIIDetector` scans both user inputs and LLM outputs for:
@@ -351,6 +360,17 @@ cd backend
 source venv/bin/activate
 pytest tests/ -v --cov=. --cov-report=html
 ```
+
+### Retrieval & Grounding Evaluation
+
+Beyond unit tests, a retrieval-evaluation harness (`backend/eval/`) measures the RAG pipeline against a labelled gold set:
+
+```bash
+make eval
+# or: cd backend && python -m eval.run_eval --k 4 --threshold 0.7
+```
+
+It reports **context relevance** (does retrieval surface the passage that holds the answer?) and **grounded-response rate** (are answerable questions answered from context, and are out-of-scope questions correctly abstained on?). It runs offline on the local MiniLM embeddings — no API key needed — and gates on a threshold so it can run in CI. Add `--generate` with a valid `GEMINI_API_KEY` to score answer faithfulness on the model's real responses.
 
 ---
 

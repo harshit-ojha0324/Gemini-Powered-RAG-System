@@ -1,4 +1,4 @@
-.PHONY: setup start stop test clean docker-start docker-stop
+.PHONY: setup start stop test eval clean docker-start docker-stop
 
 setup:
 	@echo "Setting up project..."
@@ -15,6 +15,10 @@ stop:
 test:
 	@echo "Running tests..."
 	@bash run-tests.sh
+
+eval:
+	@echo "Running RAG retrieval & grounding eval..."
+	@cd backend && $$( [ -x venv/bin/python ] && echo venv/bin/python || echo python3 ) -m eval.run_eval
 
 clean:
 	@echo "Cleaning up..."
