@@ -27,6 +27,8 @@ A full-stack **Retrieval-Augmented Generation (RAG)** application that lets you 
 
 LLM Document Agent enables intelligent question-answering over your PDF documents. Upload any PDF, ask natural language questions, and get contextual answers grounded in your document content — with full source attribution showing which page the answer came from.
 
+![Doc Q&A answering a question about a paper, with page citations linked to the retrieved passages](preview.png)
+
 The system uses a RAG pipeline:
 1. PDFs are parsed and split into **semantically-coherent chunks** (sentences are embedded and split at topic-shift breakpoints, with a recursive-character fallback)
 2. Chunks are embedded into a vector database (Chroma) using Google Gemini embeddings
@@ -40,11 +42,11 @@ Conversation history is maintained so you can ask follow-up questions naturally.
 ## Features
 
 ### Core
-- **PDF Upload & Management** — Upload, list, and delete documents via a clean web UI
+- **PDF Upload & Management** — Drag in or pick several PDFs at once, watch each one index, and list or delete documents from the web UI
 - **Semantic Chunking** — Documents are split at embedding-distance topic shifts rather than fixed-size windows, so each chunk stays on one idea (`services/document_processor.py`)
 - **Semantic Search** — Vector similarity search over document chunks using Chroma
 - **RAG-Powered Q&A** — Contextual answers from Google Gemini, grounded in your documents
-- **Source Attribution** — Every answer links back to the source document and page number
+- **Source Attribution** — Page citations in each answer link to the retrieved passage and page they came from
 - **Conversation Memory** — Multi-turn conversations with maintained chat history
 - **Embedding Fallback** — Automatically falls back to HuggingFace embeddings if Gemini quota is exceeded
 
@@ -53,7 +55,7 @@ Conversation history is maintained so you can ask follow-up questions naturally.
 - **Injection Prevention** — Detects and blocks SQL injection, prompt injection, and XSS attacks in user input
 - **Output Content Filtering** — Redacts API keys, passwords, and tokens from LLM responses before they reach the user
 - **Security Audit Logging** — All security incidents are logged with timestamps for review
-- **Security Dashboard** — Real-time monitoring UI showing incident counts, PII detections, and recent events
+- **Security Dashboard** — Real-time monitoring UI showing question, incident and PII redaction counts, and a log of flagged questions
 
 ### Developer Experience
 - **Auto-generated API Docs** — Swagger UI at `/docs` and ReDoc at `/redoc`
@@ -112,7 +114,7 @@ Conversation history is maintained so you can ask follow-up questions naturally.
 
 | Layer | Technology |
 |---|---|
-| Frontend | React 18, Vite, Axios, Lucide React |
+| Frontend | React 18, Vite, Axios, react-markdown, Lucide React |
 | Backend | Python 3.9+, FastAPI, Uvicorn |
 | LLM | Google Gemini 2.0 Flash (`langchain-google-genai`) |
 | Embeddings | Gemini Embeddings (HuggingFace fallback) |
@@ -228,6 +230,8 @@ All configuration is managed via environment variables. Copy `.env.example` to `
 | `CHROMA_TELEMETRY` | `false` | Enable/disable Chroma anonymized telemetry |
 | `DEBUG` | `true` | Enable debug mode |
 
+The frontend calls the API at `http://localhost:8000` by default. To point it elsewhere, set `VITE_API_URL` when starting or building it (for example `VITE_API_URL=https://api.example.com npm run build`).
+
 ---
 
 ## API Reference
@@ -322,9 +326,9 @@ Detection uses Microsoft Presidio (with spaCy NER) when available, with a regex-
 ### Security Dashboard
 
 The frontend Security Dashboard provides:
-- Total incident count and PII detection count
-- Breakdown of incident types
-- Timestamped log of recent security events
+- Counts of questions asked, flagged events, and PII redactions since the API started
+- A timestamped log of flagged questions with the outcome (blocked, redacted, or flagged) and the reason in plain language
+- Redacted personal data drawn as redaction bars instead of raw `[REDACTED]` tokens
 
 ### Security Logging
 
@@ -399,12 +403,18 @@ llm-document-agent/
 │
 ├── frontend/
 │   ├── src/
-│   │   ├── App.jsx                # Root component with sidebar navigation
-│   │   ├── components/
-│   │   │   ├── ChatInterface.jsx  # Q&A chat UI
-│   │   │   ├── DocumentUpload.jsx # Upload and document list management
-│   │   │   ├── MessageBubble.jsx  # Individual chat message rendering
-│   │   │   └── SecurityDashboard.jsx # Security metrics and incident log
+│   │   ├── App.jsx                # App shell: sidebar, mobile drawer, shared state
+│   │   ├── index.css              # Design tokens, base styles, shared primitives
+│   │   ├── components/            # Each component's styles sit next to it (*.css)
+│   │   │   ├── ChatInterface.jsx  # Q&A transcript, empty states, question composer
+│   │   │   ├── MessageBubble.jsx  # One question or answer: markdown, citations, sources
+│   │   │   ├── DocumentUpload.jsx # Drop zone, upload progress, document library
+│   │   │   ├── SecurityDashboard.jsx # Security counts and event log
+│   │   │   ├── Sidebar.jsx        # Navigation and API status
+│   │   │   ├── UploadList.jsx     # Per-file upload progress
+│   │   │   └── Logo.jsx           # App mark (matches public/favicon.svg)
+│   │   ├── hooks/                 # Conversation, uploads, API health polling
+│   │   ├── lib/                   # Citation parsing, security labels, formatting
 │   │   └── services/
 │   │       └── api.js             # Axios API client (all backend calls)
 │   ├── package.json

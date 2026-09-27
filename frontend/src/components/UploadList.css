@@ -1,0 +1,78 @@
+.upload-list {
+  margin-top: 16px;
+  padding: 0;
+  list-style: none;
+  border-top: 1px solid var(--line);
+}
+
+.upload {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--line);
+  font-size: 14px;
+}
+
+.upload-icon {
+  color: var(--ink-3);
+}
+
+.upload[data-status='done'] .upload-icon {
+  color: var(--live);
+}
+
+.upload[data-status='error'] .upload-icon {
+  color: var(--red);
+}
+
+.upload-name {
+  min-width: 0;
+  overflow: hidden;
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.upload-message {
+  flex: 0 1 auto;
+  margin-left: auto;
+  font-size: 13px;
+  color: var(--ink-3);
+  text-align: right;
+}
+
+.upload[data-status='error'] .upload-message {
+  color: var(--red);
+}
+
+.upload-dismiss {
+  margin-right: -6px;
+}
+
+/* Indeterminate progress along the bottom rule while a file uploads. */
+.upload[data-status='uploading'] {
+  overflow: hidden;
+}
+
+.upload[data-status='uploading']::after {
+  content: '';
+  position: absolute;
+  bottom: -1px;
+  left: 0;
+  width: 25%;
+  height: 2px;
+  background: var(--green);
+  animation: upload-progress 1.2s ease-in-out infinite;
+}
+
+@keyframes upload-progress {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(400%);
+  }
+}

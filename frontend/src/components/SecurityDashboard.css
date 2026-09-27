@@ -1,0 +1,133 @@
+.figures {
+  display: flex;
+  flex-wrap: wrap;
+  row-gap: 16px;
+}
+
+.figure {
+  display: flex;
+  flex-direction: column-reverse;
+  justify-content: flex-end;
+  gap: 2px;
+  padding: 0 32px;
+  border-left: 1px solid var(--line);
+}
+
+.figure:first-child {
+  padding-left: 0;
+  border-left: 0;
+}
+
+.figure dt {
+  font-size: 13px;
+  color: var(--ink-3);
+}
+
+.figure dd {
+  margin: 0;
+  font-size: 30px;
+  font-weight: 600;
+  line-height: 1.15;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+}
+
+.figures-note {
+  margin-top: 14px;
+  font-size: 12px;
+  color: var(--ink-3);
+}
+
+.events {
+  margin-top: 40px;
+}
+
+.event-when {
+  width: 1%;
+  color: var(--ink-2);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.event-question {
+  overflow-wrap: anywhere;
+}
+
+.event-question-text {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  line-clamp: 3;
+}
+
+.event-result {
+  width: 1%;
+  white-space: nowrap;
+}
+
+.event-flags {
+  display: block;
+  margin-top: 4px;
+  font-size: 12px;
+  color: var(--ink-3);
+}
+
+@media (max-width: 640px) {
+  .figures {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .figure {
+    padding: 0 12px;
+  }
+
+  .figure dd {
+    font-size: 24px;
+  }
+
+  .event-table thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+  }
+
+  .event-table,
+  .event-table tbody {
+    display: block;
+  }
+
+  .event-table tr {
+    display: grid;
+    grid-template-areas:
+      'when result'
+      'question question';
+    grid-template-columns: 1fr auto;
+    gap: 6px 12px;
+    padding: 12px 0;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .event-table td {
+    width: auto;
+    padding: 0;
+    border: 0;
+  }
+
+  .event-when {
+    grid-area: when;
+    font-size: 12px;
+  }
+
+  .event-result {
+    grid-area: result;
+    text-align: right;
+  }
+
+  .event-question {
+    grid-area: question;
+  }
+}

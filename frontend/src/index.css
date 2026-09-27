@@ -1,38 +1,350 @@
-* {
-  margin: 0;
-  padding: 0;
+/*
+ * Design tokens.
+ * Color is scarce and always means something:
+ *   green  — actions and the current location
+ *   marker — evidence: page citations and the passages they point to
+ *   ink    — text, and the bars that stand in for redacted personal data
+ *   red    — blocked or failed
+ * Type: Instrument Sans for the interface, Literata for text that came from
+ * the documents (answers and source excerpts).
+ */
+:root {
+  --paper: #ffffff;
+  --shelf: #f4f5f8;
+  --shelf-strong: #e9ecf1;
+  --line: #e3e6ec;
+  --line-strong: #cdd2dc;
+
+  --ink: #1c2433;
+  --ink-2: #4a5468;
+  --ink-3: #646d80;
+
+  --green: #1d5c4a;
+  --green-strong: #154536;
+  --green-tint: #e6efeb;
+  --marker: #ffe680;
+  --marker-strong: #ffd84a;
+  --red: #b3261e;
+  --red-strong: #8c1d17;
+  --red-tint: #fbeceb;
+  --live: #2e9d6a;
+
+  --font-ui: 'Instrument Sans Variable', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-read: 'Literata Variable', Charter, 'Iowan Old Style', Georgia, serif;
+  --font-mono: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+
+  --radius-s: 4px;
+  --radius-m: 6px;
+  --radius-l: 10px;
+
+  --shadow-float: 0 1px 2px rgb(28 36 51 / 0.05), 0 10px 30px -12px rgb(28 36 51 / 0.2);
+
+  color-scheme: light;
+}
+
+*,
+*::before,
+*::after {
   box-sizing: border-box;
 }
 
+* {
+  margin: 0;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
 body {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
-    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
-    sans-serif;
+  font-family: var(--font-ui);
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--ink);
+  background: var(--paper);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  min-height: 100vh;
+  text-rendering: optimizeLegibility;
 }
 
-code {
-  font-family: 'Courier New', monospace;
+button,
+input,
+textarea,
+select {
+  font: inherit;
+  color: inherit;
 }
 
-::-webkit-scrollbar {
-  width: 8px;
+button {
+  background: none;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
 }
 
-::-webkit-scrollbar-track {
-  background: #f1f1f1;
+button:disabled {
+  cursor: not-allowed;
 }
 
-::-webkit-scrollbar-thumb {
-  background: #888;
-  border-radius: 4px;
+svg {
+  flex-shrink: 0;
 }
 
-::-webkit-scrollbar-thumb:hover {
-  background: #555;
+:focus-visible {
+  outline: 2px solid var(--green);
+  outline-offset: 2px;
+}
+
+::selection {
+  background: var(--marker);
+  color: var(--ink);
+}
+
+p,
+li {
+  text-wrap: pretty;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* Buttons */
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 34px;
+  padding: 0 14px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-m);
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 1;
+  white-space: nowrap;
+  transition: background-color 0.12s, border-color 0.12s, color 0.12s;
+}
+
+.btn-sm {
+  height: 28px;
+  padding: 0 10px;
+  font-size: 13px;
+}
+
+.btn-primary {
+  background: var(--green);
+  color: #fff;
+}
+
+.btn-primary:hover:not(:disabled) {
+  background: var(--green-strong);
+}
+
+.btn-primary:disabled {
+  background: var(--shelf-strong);
+  color: var(--ink-3);
+}
+
+.btn-secondary {
+  background: var(--paper);
+  border-color: var(--line-strong);
+  color: var(--ink);
+}
+
+.btn-secondary:hover:not(:disabled) {
+  background: var(--shelf);
+}
+
+.btn-ghost {
+  color: var(--ink-2);
+}
+
+.btn-ghost:hover:not(:disabled) {
+  background: var(--shelf);
+  color: var(--ink);
+}
+
+.btn-danger {
+  background: var(--red);
+  color: #fff;
+}
+
+.btn-danger:hover:not(:disabled) {
+  background: var(--red-strong);
+}
+
+.btn-danger:disabled {
+  opacity: 0.7;
+}
+
+.icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-m);
+  color: var(--ink-3);
+  transition: background-color 0.12s, color 0.12s;
+}
+
+.icon-btn:hover:not(:disabled) {
+  background: var(--shelf-strong);
+  color: var(--ink);
+}
+
+.icon-btn-sm {
+  width: 26px;
+  height: 26px;
+}
+
+.link-btn {
+  color: var(--green);
+  font-weight: 500;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  text-decoration-thickness: 1px;
+}
+
+.link-btn:hover {
+  color: var(--green-strong);
+}
+
+/* Pages (Documents, Security) */
+
+.page {
+  max-width: 880px;
+  margin: 0 auto;
+  padding: 44px 32px 72px;
+}
+
+.page-header {
+  margin-bottom: 28px;
+}
+
+.page-header h1 {
+  font-size: 21px;
+  font-weight: 600;
+  line-height: 1.3;
+  letter-spacing: -0.01em;
+}
+
+.page-header p {
+  margin-top: 6px;
+  max-width: 62ch;
+  color: var(--ink-2);
+  font-size: 14px;
+}
+
+.section-title {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  font-size: 15px;
+  font-weight: 600;
+  margin-bottom: 12px;
+}
+
+.section-title .count {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--ink-3);
+  font-variant-numeric: tabular-nums;
+}
+
+.empty-inline {
+  padding: 28px 0;
+  color: var(--ink-3);
+  border-top: 1px solid var(--line);
+}
+
+/* Tables */
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+.table th {
+  padding: 8px 12px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--ink-3);
+  text-align: left;
+  border-bottom: 1px solid var(--line);
+  white-space: nowrap;
+}
+
+.table td {
+  padding: 12px;
+  border-bottom: 1px solid var(--line);
+  vertical-align: top;
+}
+
+.table th:first-child,
+.table td:first-child {
+  padding-left: 0;
+}
+
+.table th:last-child,
+.table td:last-child {
+  padding-right: 0;
+}
+
+.table .num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Status tags */
+
+.tag {
+  display: inline-block;
+  padding: 2px 7px;
+  border-radius: var(--radius-s);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.4;
+  background: var(--shelf-strong);
+  color: var(--ink-2);
+}
+
+.tag-blocked {
+  background: var(--red-tint);
+  color: var(--red-strong);
+}
+
+.tag-redacted {
+  background: var(--ink);
+  color: #fff;
+}
+
+/* A redaction bar: stands in for personal data removed before it left the app. */
+.redaction {
+  display: inline-block;
+  width: 4.5em;
+  height: 0.95em;
+  margin: 0 0.1em;
+  border-radius: 2px;
+  background: var(--ink);
+  vertical-align: -0.12em;
+}
+
+.spin {
+  animation: spin 0.9s linear infinite;
 }
 
 @keyframes spin {
@@ -41,6 +353,35 @@ code {
   }
 }
 
-.animate-spin {
-  animation: spin 1s linear infinite;
+@media (max-width: 860px) {
+  /* The top bar already shows the page name; keep the heading for screen readers. */
+  .page-header h1 {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
+
+  .page-header p {
+    margin-top: 0;
+  }
+}
+
+@media (max-width: 640px) {
+  .page {
+    padding: 24px 16px 56px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }

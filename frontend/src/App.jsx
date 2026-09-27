@@ -1,196 +1,192 @@
-import React, { useState, useEffect } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { FileText, Menu, MessageSquare, Plus, Shield } from 'lucide-react';
 import ChatInterface from './components/ChatInterface';
 import DocumentUpload from './components/DocumentUpload';
 import SecurityDashboard from './components/SecurityDashboard';
-import { FileText, Shield, Upload, Menu, X, MessageSquare } from 'lucide-react';
+import Sidebar, { ApiStatus } from './components/Sidebar';
+import useApiStatus from './hooks/useApiStatus';
+import useConversation from './hooks/useConversation';
+import useUploads from './hooks/useUploads';
 import api from './services/api';
+import './App.css';
 
-function App() {
-  const [activeTab, setActiveTab] = useState('chat');
-  const [documents, setDocuments] = useState([]);
-  const [stats, setStats] = useState(null);
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+const VIEWS = [
+  { id: 'chat', label: 'Chat', icon: MessageSquare },
+  { id: 'documents', label: 'Documents', icon: FileText },
+  { id: 'security', label: 'Security', icon: Shield },
+];
+
+const STATS_POLL_MS = 10000;
+// Keep in sync with the 860px breakpoint in App.css.
+const DOCKED_SIDEBAR_QUERY = '(min-width: 861px)';
+
+function Drawer({ onClose, returnFocusRef, children }) {
+  const panelRef = useRef(null);
 
   useEffect(() => {
-    loadDocuments();
-    loadStats();
-    const interval = setInterval(loadStats, 10000);
-    return () => clearInterval(interval);
-  }, []);
-
-  const loadDocuments = async () => {
-    try {
-      const response = await api.get('/api/documents');
-      setDocuments(response.data.documents);
-    } catch (error) {
-      console.error('Error loading documents:', error);
-    }
-  };
-
-  const loadStats = async () => {
-    try {
-      const response = await api.get('/api/stats');
-      setStats(response.data.statistics);
-    } catch (error) {
-      console.error('Error loading stats:', error);
-    }
-  };
-
-  const handleDocumentUpload = () => {
-    loadDocuments();
-    loadStats();
-  };
-
-  const navItems = [
-    { id: 'chat', label: 'Chat', icon: <MessageSquare size={17} /> },
-    { id: 'upload', label: 'Documents', icon: <Upload size={17} />, badge: documents.length || null },
-    { id: 'security', label: 'Security', icon: <Shield size={17} />, badge: stats?.security_incidents || null },
-  ];
+    const panel = panelRef.current;
+    (panel?.querySelector('[aria-current="page"]') || panel?.querySelector('button'))?.focus();
+    const onKeyDown = (event) => {
+      if (event.key === 'Escape') onClose();
+    };
+    // The drawer only exists on small screens; close it if the window widens.
+    const docked = window.matchMedia(DOCKED_SIDEBAR_QUERY);
+    const onResize = () => docked.matches && onClose();
+    document.addEventListener('keydown', onKeyDown);
+    docked.addEventListener('change', onResize);
+    return () => {
+      document.removeEventListener('keydown', onKeyDown);
+      docked.removeEventListener('change', onResize);
+      // Opening the drawer makes the page behind it inert, which blurs the menu
+      // button, so the button is passed in rather than read from activeElement.
+      returnFocusRef.current?.focus();
+    };
+  }, [onClose, returnFocusRef]);
 
   return (
-    <div style={{ display: 'flex', height: '100vh', fontFamily: 'system-ui, -apple-system, sans-serif', background: '#f8fafc' }}>
-
-      {/* Sidebar */}
-      <div style={{
-        width: sidebarOpen ? '240px' : '0',
-        background: 'linear-gradient(180deg, #1e1b4b 0%, #0f0d2e 100%)',
-        color: 'white',
-        transition: 'width 0.25s ease',
-        overflow: 'hidden',
-        display: 'flex',
-        flexDirection: 'column',
-        flexShrink: 0
-      }}>
-        {/* Logo */}
-        <div style={{ padding: '24px 20px 16px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '28px' }}>
-            <div style={{
-              width: '36px',
-              height: '36px',
-              background: 'linear-gradient(135deg, #8b5cf6, #6d28d9)',
-              borderRadius: '10px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              flexShrink: 0
-            }}>
-              <FileText size={20} color="white" />
-            </div>
-            <div>
-              <div style={{ fontSize: '15px', fontWeight: '700', letterSpacing: '-0.3px' }}>Doc Q&A</div>
-              <div style={{ fontSize: '10px', opacity: 0.5, marginTop: '1px' }}>Powered by Gemini</div>
-            </div>
-          </div>
-
-          {/* Nav */}
-          <nav style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-            {navItems.map(item => (
-              <button
-                key={item.id}
-                onClick={() => setActiveTab(item.id)}
-                style={{
-                  width: '100%',
-                  padding: '10px 12px',
-                  background: activeTab === item.id ? 'rgba(139,92,246,0.25)' : 'transparent',
-                  border: activeTab === item.id ? '1px solid rgba(139,92,246,0.4)' : '1px solid transparent',
-                  borderRadius: '8px',
-                  color: activeTab === item.id ? '#c4b5fd' : 'rgba(255,255,255,0.6)',
-                  cursor: 'pointer',
-                  textAlign: 'left',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '10px',
-                  fontSize: '13px',
-                  fontWeight: activeTab === item.id ? '600' : '400',
-                  transition: 'all 0.15s'
-                }}
-              >
-                {item.icon}
-                <span style={{ flex: 1 }}>{item.label}</span>
-                {item.badge > 0 && (
-                  <span style={{
-                    background: activeTab === item.id ? '#8b5cf6' : 'rgba(255,255,255,0.15)',
-                    borderRadius: '10px',
-                    padding: '1px 7px',
-                    fontSize: '11px',
-                    fontWeight: '600'
-                  }}>
-                    {item.badge}
-                  </span>
-                )}
-              </button>
-            ))}
-          </nav>
-        </div>
-
-        {/* Stats */}
-        {stats && (
-          <div style={{ marginTop: 'auto', padding: '16px 20px', borderTop: '1px solid rgba(255,255,255,0.07)' }}>
-            <div style={{ fontSize: '10px', fontWeight: '600', color: 'rgba(255,255,255,0.35)', letterSpacing: '0.8px', marginBottom: '10px', textTransform: 'uppercase' }}>
-              Overview
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-              {[
-                { label: 'Documents', value: stats.total_documents },
-                { label: 'Queries', value: stats.total_queries },
-                { label: 'Security events', value: stats.security_incidents },
-              ].map(({ label, value }) => (
-                <div key={label} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '12px' }}>
-                  <span style={{ color: 'rgba(255,255,255,0.45)' }}>{label}</span>
-                  <span style={{ color: 'rgba(255,255,255,0.85)', fontWeight: '600' }}>{value}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
+    <div className="drawer-layer">
+      <div className="drawer-backdrop" onClick={onClose} />
+      <div className="drawer" ref={panelRef} role="dialog" aria-modal="true" aria-label="Navigation">
+        {children}
       </div>
+    </div>
+  );
+}
 
-      {/* Main */}
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-        {/* Header */}
-        <header style={{
-          background: 'white',
-          padding: '0 20px',
-          height: '52px',
-          boxShadow: '0 1px 0 #e5e7eb',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          flexShrink: 0
-        }}>
+function App() {
+  const [view, setView] = useState('chat');
+  const [documents, setDocuments] = useState([]);
+  const [libraryState, setLibraryState] = useState('loading');
+  const [stats, setStats] = useState(null);
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const fileInput = useRef(null);
+  const menuButton = useRef(null);
+  const apiStatus = useApiStatus();
+
+  const loadDocuments = useCallback(async () => {
+    try {
+      const { data } = await api.get('/api/documents');
+      const newestFirst = [...data.documents].sort((a, b) =>
+        String(b.uploaded_at).localeCompare(String(a.uploaded_at))
+      );
+      setDocuments(newestFirst);
+      setLibraryState('ready');
+    } catch {
+      setLibraryState((state) => (state === 'ready' ? state : 'error'));
+    }
+  }, []);
+
+  const loadStats = useCallback(async () => {
+    try {
+      const { data } = await api.get('/api/stats');
+      setStats(data.statistics);
+    } catch {
+      // Keep the last known counts; the status indicator reports the outage.
+    }
+  }, []);
+
+  const refreshLibrary = useCallback(() => {
+    loadDocuments();
+    loadStats();
+  }, [loadDocuments, loadStats]);
+
+  // Load once the first health check settles, and again whenever the API comes back.
+  useEffect(() => {
+    if (apiStatus !== 'checking') refreshLibrary();
+  }, [apiStatus, refreshLibrary]);
+
+  useEffect(() => {
+    const timer = setInterval(loadStats, STATS_POLL_MS);
+    return () => clearInterval(timer);
+  }, [loadStats]);
+
+  const { uploads, upload, dismiss } = useUploads(refreshLibrary);
+  const conversation = useConversation({ onSettled: loadStats });
+
+  const chooseFiles = useCallback(() => fileInput.current?.click(), []);
+  const closeDrawer = useCallback(() => setDrawerOpen(false), []);
+  const navigate = useCallback((id) => {
+    setView(id);
+    setDrawerOpen(false);
+  }, []);
+
+  const sidebarProps = {
+    views: VIEWS,
+    current: view,
+    counts: { documents: documents.length, security: stats?.security_incidents ?? 0 },
+    onNavigate: navigate,
+    apiStatus,
+  };
+
+  return (
+    <div className="app">
+      <Sidebar {...sidebarProps} className="sidebar-docked" />
+
+      <div className="main" inert={drawerOpen ? '' : undefined}>
+        <header className="topbar">
           <button
-            onClick={() => setSidebarOpen(!sidebarOpen)}
-            style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '6px', borderRadius: '6px', color: '#6b7280', display: 'flex' }}
+            type="button"
+            className="icon-btn"
+            ref={menuButton}
+            onClick={() => setDrawerOpen(true)}
+            aria-label="Open navigation"
           >
-            {sidebarOpen ? <X size={20} /> : <Menu size={20} />}
+            <Menu size={18} aria-hidden="true" />
           </button>
-
-          <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-            {documents.length > 0 && (
-              <span style={{ fontSize: '12px', color: '#9ca3af' }}>
-                {documents.length} doc{documents.length !== 1 ? 's' : ''} loaded
-              </span>
-            )}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <div style={{ width: '7px', height: '7px', background: '#22c55e', borderRadius: '50%' }} />
-              <span style={{ fontSize: '12px', color: '#6b7280' }}>API connected</span>
-            </div>
-          </div>
+          <span className="topbar-title">{VIEWS.find((item) => item.id === view).label}</span>
+          {view === 'chat' && conversation.messages.length > 0 && (
+            <button type="button" className="icon-btn" onClick={conversation.reset} aria-label="New chat" title="New chat">
+              <Plus size={18} aria-hidden="true" />
+            </button>
+          )}
+          <ApiStatus status={apiStatus} compact />
         </header>
 
-        {/* Content */}
-        <main style={{ flex: 1, overflow: 'auto' }}>
-          {activeTab === 'chat' && <ChatInterface documents={documents} />}
-          {activeTab === 'security' && <SecurityDashboard />}
-          {activeTab === 'upload' && (
-            <DocumentUpload
-              onUploadSuccess={handleDocumentUpload}
+        <main className="view">
+          {view === 'chat' && (
+            <ChatInterface
               documents={documents}
-              onDeleteSuccess={handleDocumentUpload}
+              libraryState={libraryState}
+              apiStatus={apiStatus}
+              conversation={conversation}
+              uploads={uploads}
+              onChooseFiles={chooseFiles}
+              onDismissUpload={dismiss}
+              onNavigate={navigate}
             />
           )}
+          {view === 'documents' && (
+            <DocumentUpload
+              documents={documents}
+              libraryState={libraryState}
+              uploads={uploads}
+              onUploadFiles={upload}
+              onChooseFiles={chooseFiles}
+              onDismissUpload={dismiss}
+              onDocumentsChanged={refreshLibrary}
+            />
+          )}
+          {view === 'security' && <SecurityDashboard stats={stats} onRefreshStats={loadStats} />}
         </main>
       </div>
+
+      {drawerOpen && (
+        <Drawer onClose={closeDrawer} returnFocusRef={menuButton}>
+          <Sidebar {...sidebarProps} />
+        </Drawer>
+      )}
+
+      <input
+        ref={fileInput}
+        type="file"
+        accept="application/pdf,.pdf"
+        multiple
+        hidden
+        onChange={(event) => {
+          upload(event.target.files);
+          event.target.value = '';
+        }}
+      />
     </div>
   );
 }

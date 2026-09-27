@@ -1,143 +1,241 @@
-import React, { useState } from 'react';
-import { User, Bot, AlertTriangle, ChevronDown, ChevronUp, FileText } from 'lucide-react';
+import { createContext, memo, useContext, useMemo, useRef, useState } from 'react';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
+import { AlertCircle, AlertTriangle, Check, ChevronRight, Copy, FileText, RotateCcw, ShieldAlert } from 'lucide-react';
+import rehypeEvidence from '../lib/evidence';
+import { describeWarnings } from '../lib/security';
+import { scrollBehavior } from '../lib/motion';
+import './MessageBubble.css';
 
-function MessageBubble({ message }) {
-  const [showSources, setShowSources] = useState(false);
-  const isUser = message.role === 'user';
+// Lets the citation chips inside the rendered markdown reach the answer's
+// source list without remounting the markdown on every click.
+const EvidenceContext = createContext({ activePage: null, showPage: () => {} });
+
+function Cite(props) {
+  const { activePage, showPage } = useContext(EvidenceContext);
+  const page = props['data-page'];
+  if (props['data-linked'] !== 'true') {
+    return <span className="cite cite-unlinked">{props.children}</span>;
+  }
+  return (
+    <button
+      type="button"
+      className="cite"
+      aria-pressed={activePage === page}
+      aria-label={`Show the passage from page ${page}`}
+      onClick={() => showPage(page)}
+    >
+      {props.children}
+    </button>
+  );
+}
+
+function Redaction() {
+  return <span className="redaction" role="img" aria-label="Redacted" />;
+}
+
+function Link({ href, children }) {
+  return (
+    <a href={href} target="_blank" rel="noreferrer">
+      {children}
+    </a>
+  );
+}
+
+const MARKDOWN_COMPONENTS = { cite: Cite, redaction: Redaction, a: Link };
+
+// The backend cuts passages at 200 characters and always appends "...".
+// Show an ellipsis only when the passage doesn't already end a sentence.
+function cleanExcerpt(text = '') {
+  const passage = text.replace(/\s+/g, ' ').trim().replace(/\.\.\.$/, '').trimEnd();
+  return /[.!?]$/.test(passage) ? passage : `${passage}…`;
+}
+
+function pageLabel(page) {
+  return /^\d+$/.test(String(page)) ? `p. ${page}` : '';
+}
+
+function CopyButton({ text }) {
+  const [copied, setCopied] = useState(false);
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1600);
+    } catch {
+      // Clipboard access can be refused (e.g. outside a secure context); nothing to do.
+    }
+  };
+  return (
+    <button type="button" className="btn btn-ghost btn-sm" onClick={copy}>
+      {copied ? <Check size={14} aria-hidden="true" /> : <Copy size={14} aria-hidden="true" />}
+      {copied ? 'Copied' : 'Copy'}
+    </button>
+  );
+}
+
+function Sources({ sources, activePage, open, onToggle, listRef }) {
+  const groups = useMemo(() => {
+    const byDocument = new Map();
+    for (const source of sources) {
+      const name = source.source || 'Unknown document';
+      if (!byDocument.has(name)) byDocument.set(name, []);
+      byDocument.get(name).push(source);
+    }
+    for (const list of byDocument.values()) {
+      list.sort((a, b) => (Number(a.page) || 0) - (Number(b.page) || 0));
+    }
+    return [...byDocument.entries()];
+  }, [sources]);
 
   return (
-    <div style={{
-      display: 'flex',
-      gap: '10px',
-      alignItems: 'flex-start',
-      justifyContent: isUser ? 'flex-end' : 'flex-start'
-    }}>
-      {!isUser && (
-        <div style={{
-          width: '34px',
-          height: '34px',
-          borderRadius: '10px',
-          background: 'linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          flexShrink: 0,
-          boxShadow: '0 2px 6px rgba(139,92,246,0.3)'
-        }}>
-          <Bot size={18} color="white" />
+    <details className="sources" open={open} onToggle={(event) => onToggle(event.currentTarget.open)} ref={listRef}>
+      <summary>
+        <ChevronRight size={14} className="sources-chevron" aria-hidden="true" />
+        Sources
+        <span className="sources-count">{sources.length}</span>
+      </summary>
+      {groups.map(([name, items]) => (
+        <div className="source-group" key={name}>
+          <p className="source-doc">
+            <FileText size={13} aria-hidden="true" />
+            <span>{name}</span>
+          </p>
+          <ul className="source-list">
+            {items.map((source, index) => (
+              <li
+                key={index}
+                className={`source${activePage === String(source.page) ? ' is-active' : ''}`}
+                data-page={source.page}
+              >
+                <span className="source-page">{pageLabel(source.page)}</span>
+                <p className="source-text">
+                  <span className="source-quote">{cleanExcerpt(source.content)}</span>
+                </p>
+              </li>
+            ))}
+          </ul>
         </div>
-      )}
+      ))}
+    </details>
+  );
+}
 
-      <div style={{
-        maxWidth: '72%',
-        background: isUser
-          ? 'linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)'
-          : message.error ? '#fff1f2' : 'white',
-        color: isUser ? 'white' : message.error ? '#be123c' : '#1f2937',
-        padding: '12px 16px',
-        borderRadius: isUser ? '16px 4px 16px 16px' : '4px 16px 16px 16px',
-        boxShadow: '0 1px 4px rgba(0,0,0,0.08)',
-        border: message.error ? '1px solid #fecdd3' : 'none'
-      }}>
-        <p style={{ lineHeight: '1.65', margin: 0, fontSize: '14px', whiteSpace: 'pre-wrap' }}>
-          {message.content}
+function Answer({ message }) {
+  const sources = message.sources || [];
+  const [activePage, setActivePage] = useState(null);
+  const [sourcesOpen, setSourcesOpen] = useState(true);
+  const sourcesRef = useRef(null);
+  const notices = useMemo(() => describeWarnings(message.warnings), [message.warnings]);
+  const pages = useMemo(() => [...new Set(sources.map((source) => String(source.page)))], [sources]);
+
+  const showPage = (page) => {
+    const next = activePage === page ? null : page;
+    setActivePage(next);
+    if (!next) return;
+    setSourcesOpen(true);
+    requestAnimationFrame(() => {
+      sourcesRef.current
+        ?.querySelector(`.source[data-page="${CSS.escape(page)}"]`)
+        ?.scrollIntoView({ block: 'nearest', behavior: scrollBehavior() });
+    });
+  };
+
+  // Parse the markdown once per answer; chip state flows through context.
+  const body = useMemo(
+    () => (
+      <ReactMarkdown
+        remarkPlugins={[remarkGfm]}
+        rehypePlugins={[[rehypeEvidence, { pages }]]}
+        components={MARKDOWN_COMPONENTS}
+        skipHtml
+      >
+        {message.content}
+      </ReactMarkdown>
+    ),
+    [message.content, pages]
+  );
+
+  return (
+    <article className="answer">
+      {notices.map((notice, index) => (
+        <p key={index} className={`notice notice-${notice.kind}`}>
+          {notice.kind === 'redacted' ? (
+            <span className="redaction notice-bar" aria-hidden="true" />
+          ) : (
+            <AlertTriangle size={14} aria-hidden="true" />
+          )}
+          <span>{notice.text}</span>
         </p>
+      ))}
 
-        {/* Security Warnings */}
-        {message.warnings && message.warnings.length > 0 && (
-          <div style={{
-            marginTop: '10px',
-            padding: '8px 12px',
-            background: 'rgba(251,191,36,0.15)',
-            borderLeft: '3px solid #fbbf24',
-            borderRadius: '4px',
-            display: 'flex',
-            alignItems: 'flex-start',
-            gap: '6px',
-            fontSize: '12px',
-            color: '#92400e'
-          }}>
-            <AlertTriangle size={13} style={{ marginTop: '1px', flexShrink: 0 }} />
-            <span>{message.warnings.join(' · ')}</span>
-          </div>
-        )}
+      <EvidenceContext.Provider value={{ activePage, showPage }}>
+        <div className="answer-body">{body}</div>
+      </EvidenceContext.Provider>
 
-        {/* Sources */}
-        {message.sources && message.sources.length > 0 && (
-          <div style={{ marginTop: '10px' }}>
-            <button
-              onClick={() => setShowSources(!showSources)}
-              style={{
-                background: 'rgba(139,92,246,0.08)',
-                border: 'none',
-                color: '#7c3aed',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '4px',
-                fontSize: '12px',
-                padding: '4px 8px',
-                borderRadius: '4px',
-                fontWeight: '500'
-              }}
-            >
-              {showSources ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
-              {message.sources.length} source{message.sources.length !== 1 ? 's' : ''}
-            </button>
-
-            {showSources && (
-              <div style={{
-                marginTop: '8px',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '8px'
-              }}>
-                {message.sources.map((source, idx) => (
-                  <div key={idx} style={{
-                    padding: '8px 10px',
-                    background: 'rgba(0,0,0,0.03)',
-                    borderRadius: '6px',
-                    borderLeft: '2px solid #8b5cf6',
-                    fontSize: '12px'
-                  }}>
-                    <div style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '4px',
-                      marginBottom: '4px',
-                      fontWeight: '600',
-                      color: '#4b5563'
-                    }}>
-                      <FileText size={11} />
-                      {source.source} · Page {source.page}
-                    </div>
-                    <p style={{ margin: 0, color: '#6b7280', lineHeight: '1.5' }}>
-                      {source.content}
-                    </p>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
-      </div>
-
-      {isUser && (
-        <div style={{
-          width: '34px',
-          height: '34px',
-          borderRadius: '10px',
-          background: '#e9d5ff',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          flexShrink: 0
-        }}>
-          <User size={18} color="#7c3aed" />
-        </div>
+      {sources.length > 0 && (
+        <Sources
+          sources={sources}
+          activePage={activePage}
+          open={sourcesOpen}
+          onToggle={setSourcesOpen}
+          listRef={sourcesRef}
+        />
       )}
+
+      <div className="answer-actions">
+        <CopyButton text={message.content} />
+      </div>
+    </article>
+  );
+}
+
+function BlockedReply({ onNavigate }) {
+  return (
+    <div className="reply-callout reply-blocked">
+      <ShieldAlert size={18} aria-hidden="true" />
+      <div>
+        <p className="callout-title">Blocked by the security filter</p>
+        <p>
+          This question matched an injection pattern (SQL, script, or instructions aimed at the
+          assistant), so it was never sent to Gemini. Rephrase it as a plain question about your
+          documents.
+        </p>
+        <button type="button" className="link-btn" onClick={() => onNavigate('security')}>
+          View security log
+        </button>
+      </div>
     </div>
   );
 }
 
-export default MessageBubble;
+function FailedReply({ message, onRetry }) {
+  return (
+    <div className="reply-callout reply-failed">
+      <AlertCircle size={18} aria-hidden="true" />
+      <div>
+        <p className="callout-title">Couldn&apos;t get an answer</p>
+        <p>{message.content}</p>
+        <button type="button" className="btn btn-secondary btn-sm" onClick={() => onRetry(message.id)}>
+          <RotateCcw size={14} aria-hidden="true" />
+          Try again
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function MessageBubble({ message, anchorRef, onRetry, onNavigate }) {
+  if (message.role === 'user') {
+    return (
+      <h2 className="question" ref={anchorRef}>
+        {message.content}
+      </h2>
+    );
+  }
+  if (message.status === 'blocked') return <BlockedReply onNavigate={onNavigate} />;
+  if (message.status === 'error') return <FailedReply message={message} onRetry={onRetry} />;
+  return <Answer message={message} />;
+}
+
+export default memo(MessageBubble);

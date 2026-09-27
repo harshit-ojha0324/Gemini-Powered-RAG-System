@@ -1,0 +1,144 @@
+.dropzone {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 20px 20px 20px 24px;
+  border: 1.5px dashed var(--line-strong);
+  border-radius: var(--radius-l);
+  background: var(--paper);
+  transition: border-color 0.12s, background-color 0.12s;
+}
+
+.dropzone.is-active {
+  border-color: var(--green);
+  background: var(--green-tint);
+}
+
+.dropzone-icon {
+  color: var(--ink-3);
+}
+
+.dropzone.is-active .dropzone-icon {
+  color: var(--green);
+}
+
+.dropzone-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.dropzone-title {
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.dropzone-hint {
+  margin-top: 2px;
+  font-size: 13px;
+  color: var(--ink-3);
+}
+
+.library {
+  margin-top: 40px;
+}
+
+.library-error {
+  margin-bottom: 12px;
+  font-size: 13px;
+  color: var(--red);
+}
+
+.doc-table td {
+  vertical-align: middle;
+}
+
+/* Let long file names truncate instead of widening the table. */
+.doc-name-cell {
+  width: 100%;
+  max-width: 0;
+}
+
+.doc-name {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-weight: 500;
+}
+
+.doc-name svg {
+  color: var(--ink-3);
+}
+
+.doc-name span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.doc-size,
+.doc-added {
+  color: var(--ink-2);
+  white-space: nowrap;
+}
+
+/* Two classes so this outranks the generic `.table td` padding. */
+.doc-table .doc-actions {
+  width: 1%;
+  padding-top: 6px;
+  padding-bottom: 6px;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.confirm-row td {
+  padding-top: 6px;
+  padding-bottom: 6px;
+}
+
+.confirm {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 33px;
+  padding: 0 6px 0 12px;
+  border-radius: var(--radius-m);
+  background: var(--red-tint);
+}
+
+.confirm-text {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  font-size: 13px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.confirm-text strong {
+  font-weight: 600;
+}
+
+@media (max-width: 640px) {
+  .dropzone {
+    flex-wrap: wrap;
+    padding: 16px;
+  }
+
+  .dropzone .btn {
+    width: 100%;
+  }
+
+  .doc-added {
+    display: none;
+  }
+
+  .confirm {
+    flex-wrap: wrap;
+    padding: 8px 6px 8px 12px;
+  }
+
+  .confirm-text {
+    flex-basis: 100%;
+    white-space: normal;
+  }
+}

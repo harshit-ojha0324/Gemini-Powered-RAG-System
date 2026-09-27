@@ -1,0 +1,355 @@
+/* The transcript reads like a Q&A document: the question in the interface face,
+   the answer and its sources in the reading face. */
+
+.question {
+  font-size: 17px;
+  font-weight: 600;
+  line-height: 1.45;
+  letter-spacing: -0.005em;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  scroll-margin-top: 24px;
+}
+
+.transcript > .question:not(:first-child) {
+  margin-top: 40px;
+  padding-top: 40px;
+  border-top: 1px solid var(--line);
+}
+
+.answer,
+.reply-callout {
+  margin-top: 14px;
+}
+
+/* Answer text (markdown) */
+
+.answer-body {
+  font-family: var(--font-read);
+  font-size: 17px;
+  font-optical-sizing: auto;
+  line-height: 1.7;
+  overflow-wrap: break-word;
+}
+
+.answer-body > * + * {
+  margin-top: 0.8em;
+}
+
+.answer-body ul,
+.answer-body ol {
+  padding-left: 1.4em;
+}
+
+.answer-body li + li,
+.answer-body li > ul,
+.answer-body li > ol {
+  margin-top: 0.4em;
+}
+
+.answer-body li::marker {
+  color: var(--ink-3);
+}
+
+.answer-body strong {
+  font-weight: 600;
+}
+
+.answer-body h1,
+.answer-body h2,
+.answer-body h3,
+.answer-body h4 {
+  margin-top: 1.4em;
+  font-family: var(--font-ui);
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.answer-body blockquote {
+  padding-left: 14px;
+  border-left: 2px solid var(--line-strong);
+  color: var(--ink-2);
+}
+
+.answer-body a {
+  color: var(--green);
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+}
+
+.answer-body code {
+  padding: 0.12em 0.35em;
+  border-radius: var(--radius-s);
+  background: var(--shelf);
+  font-family: var(--font-mono);
+  font-size: 0.82em;
+}
+
+.answer-body pre {
+  padding: 12px 14px;
+  border-radius: var(--radius-m);
+  background: var(--shelf);
+  font-size: 13px;
+  line-height: 1.55;
+  overflow-x: auto;
+}
+
+.answer-body pre code {
+  padding: 0;
+  background: none;
+  font-size: inherit;
+}
+
+.answer-body table {
+  display: block;
+  overflow-x: auto;
+  border-collapse: collapse;
+  font-family: var(--font-ui);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.answer-body th,
+.answer-body td {
+  padding: 6px 16px 6px 0;
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+  vertical-align: top;
+}
+
+.answer-body th {
+  font-weight: 600;
+}
+
+.answer-body hr {
+  border: 0;
+  border-top: 1px solid var(--line);
+}
+
+/* Page citations: marker-yellow chips that point at a source passage */
+
+.cite {
+  display: inline-block;
+  margin: 0 1px;
+  padding: 0.22em 0.42em 0.16em;
+  border-radius: var(--radius-s);
+  background: var(--marker);
+  color: var(--ink);
+  font-family: var(--font-ui);
+  font-size: 12px;
+  font-style: normal;
+  font-weight: 600;
+  line-height: 1.2;
+  white-space: nowrap;
+  vertical-align: 0.1em;
+  transition: background-color 0.12s, box-shadow 0.12s;
+}
+
+.cite + .cite {
+  margin-left: 4px;
+}
+
+button.cite:hover {
+  background: var(--marker-strong);
+}
+
+.cite[aria-pressed='true'] {
+  box-shadow: inset 0 0 0 1.5px var(--ink);
+}
+
+.cite-unlinked {
+  background: var(--shelf-strong);
+  color: var(--ink-2);
+}
+
+/* Security notices above an answer */
+
+.notice {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+  font-size: 13px;
+  color: var(--ink-2);
+}
+
+.notice svg {
+  color: var(--ink-3);
+}
+
+.notice-bar {
+  width: 2.2em;
+  height: 0.9em;
+  margin: 0;
+  vertical-align: middle;
+}
+
+/* Sources */
+
+.sources {
+  margin-top: 22px;
+}
+
+.sources summary {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 0;
+  border-radius: var(--radius-s);
+  color: var(--ink-2);
+  font-size: 13px;
+  font-weight: 600;
+  list-style: none;
+  cursor: pointer;
+}
+
+.sources summary::-webkit-details-marker {
+  display: none;
+}
+
+.sources summary:hover {
+  color: var(--ink);
+}
+
+.sources-chevron {
+  color: var(--ink-3);
+  transition: transform 0.15s;
+}
+
+.sources[open] .sources-chevron {
+  transform: rotate(90deg);
+}
+
+.sources-count {
+  color: var(--ink-3);
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+
+.source-group {
+  margin-top: 12px;
+}
+
+.source-doc {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 4px;
+  font-size: 12px;
+  color: var(--ink-3);
+}
+
+.source-doc span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.source-list {
+  padding: 0;
+  list-style: none;
+}
+
+.source {
+  display: grid;
+  grid-template-columns: 3.2em minmax(0, 1fr);
+  gap: 10px;
+  padding: 10px 0;
+  border-top: 1px solid var(--line);
+  scroll-margin: 24px;
+}
+
+.source-page {
+  padding-top: 0.25em;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink-2);
+  font-variant-numeric: tabular-nums;
+}
+
+.source-text {
+  font-family: var(--font-read);
+  font-size: 14.5px;
+  line-height: 1.65;
+  color: var(--ink-2);
+}
+
+/* Clicking a citation runs a highlighter over the passage it points to. */
+.source-quote {
+  background-image: linear-gradient(var(--marker), var(--marker));
+  background-repeat: no-repeat;
+  background-size: 0% 100%;
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
+}
+
+.source.is-active .source-quote {
+  color: var(--ink);
+  background-size: 100% 100%;
+  animation: marker-sweep 0.55s cubic-bezier(0.3, 0.7, 0.4, 1);
+}
+
+@keyframes marker-sweep {
+  from {
+    background-size: 0% 100%;
+  }
+}
+
+.answer-actions {
+  display: flex;
+  gap: 4px;
+  margin: 10px 0 0 -10px;
+}
+
+/* Replies without an answer */
+
+.reply-callout {
+  display: flex;
+  gap: 12px;
+  padding: 14px 16px;
+  border-radius: var(--radius-m);
+  font-size: 14px;
+  line-height: 1.55;
+}
+
+.reply-callout > svg {
+  margin-top: 1px;
+}
+
+.reply-callout p + p {
+  margin-top: 4px;
+}
+
+.reply-callout .btn,
+.reply-callout .link-btn {
+  margin-top: 10px;
+}
+
+.callout-title {
+  font-weight: 600;
+}
+
+.reply-blocked {
+  background: var(--red-tint);
+  color: var(--ink-2);
+}
+
+.reply-blocked > svg,
+.reply-blocked .callout-title {
+  color: var(--red-strong);
+}
+
+.reply-failed {
+  background: var(--shelf);
+  color: var(--ink-2);
+}
+
+.reply-failed > svg {
+  color: var(--red);
+}
+
+.reply-failed .callout-title {
+  color: var(--ink);
+}
