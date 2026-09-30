@@ -197,6 +197,20 @@ make docker-start
 make docker-stop
 ```
 
+**About the backend image**
+
+`backend/Dockerfile` is a two-stage build: dependencies are installed into a virtualenv in a builder stage, and only that virtualenv plus the app code are copied into the runtime image. The runtime image:
+
+- runs as a non-root user (UID/GID 1000 by default, override with `--build-arg APP_UID=... --build-arg APP_GID=...`)
+- installs the CPU-only PyTorch build, since the fallback embeddings run on CPU (use `--build-arg TORCH_INDEX_URL=https://pypi.org/simple` for the CUDA build)
+- has a `HEALTHCHECK` against `/api/health`
+
+CI builds the image and waits for it to report healthy on every push and pull request to `main`. To build it on its own:
+
+```bash
+docker build -t rag-backend backend
+```
+
 ### Makefile Commands
 
 ```bash
@@ -454,3 +468,7 @@ lsof -i :5173
 **Docker: environment variables not picked up**
 
 Ensure your `.env` file is in the project root (not `backend/.env`) when running Docker Compose, as `docker-compose.yml` reads from the project root.
+
+**Docker: permission denied writing to `data/` (Linux)**
+
+The backend container runs as UID 1000, not root. If `data/` was created by an older image that ran as root, or your host user has a different UID, either give the directory to UID 1000 (`sudo chown -R 1000:1000 data`) or rebuild with your own IDs (`--build-arg APP_UID=$(id -u) --build-arg APP_GID=$(id -g)`). Docker Desktop on macOS usually maps file ownership for you, so this mostly affects Linux hosts.

@@ -31,3 +31,40 @@ jobs:
 
       - name: Run tests
         run: pytest
+
+  backend-image:
+    name: Backend image (build + smoke test)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build image
+        run: docker build -t rag-backend:ci backend
+
+      - name: Start container
+        # Dummy key, as above: the smoke test only checks that the API boots and passes its healthcheck.
+        run: docker run -d --name backend -e GEMINI_API_KEY=test-key rag-backend:ci
+
+      - name: Wait for healthcheck
+        run: |
+          for _ in $(seq 1 40); do
+            state=$(docker inspect --format '{{.State.Status}} {{.State.Health.Status}}' backend)
+            echo "$state"
+            case "$state" in
+              "running healthy") exit 0 ;;
+              *unhealthy) break ;;
+              running*) sleep 5 ;;
+              *) break ;;
+            esac
+          done
+          docker logs backend
+          exit 1
+
+      - name: Check it runs as non-root
+        run: |
+          uid=$(docker exec backend id -u)
+          echo "container uid: $uid"
+          test "$uid" -ne 0
+
+      - name: Image size
+        run: docker image ls rag-backend:ci
