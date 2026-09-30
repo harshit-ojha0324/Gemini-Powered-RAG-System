@@ -36,11 +36,17 @@ COPY requirements.txt .
 # be ABI-compatible); requirements.txt's "torch==X" is then already satisfied by
 # "X+cpu". Pass --build-arg TORCH_INDEX_URL=https://pypi.org/simple to get the
 # CUDA builds instead.
+#
+# --no-deps: take only these two wheels from the PyTorch index. Its mirrors of
+# their dependencies (jinja2, typing-extensions, ...) fail pip's metadata checks,
+# so those come from PyPI in the next install, and pip check confirms nothing
+# was left out.
 ARG TORCH_INDEX_URL=https://download.pytorch.org/whl/cpu
 # The $(grep ...) is unquoted on purpose: each pin becomes its own argument.
 # hadolint ignore=SC2046
-RUN pip install --index-url "$TORCH_INDEX_URL" $(grep -E '^(torch|torchvision)==' requirements.txt) \
+RUN pip install --no-deps --index-url "$TORCH_INDEX_URL" $(grep -E '^(torch|torchvision)==' requirements.txt) \
     && pip install -r requirements.txt \
+    && pip check \
     && python -m spacy download en_core_web_lg
 
 
