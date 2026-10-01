@@ -4,7 +4,6 @@ from langchain.prompts import PromptTemplate
 from langchain.schema import AIMessage, HumanMessage
 from typing import List, Dict, Optional
 import os
-from dotenv import load_dotenv
 from google.api_core.exceptions import ResourceExhausted
 from tenacity import retry, stop_after_attempt, retry_if_exception_type
 import google.api_core.exceptions as _gexc
@@ -22,8 +21,6 @@ _gcm._create_retry_decorator = _patched_retry_decorator
 
 from services.vectorstore import VectorStoreService
 from agents.prompt_templates import RAG_PROMPT_TEMPLATE, CONDENSE_QUESTION_TEMPLATE
-
-load_dotenv()
 
 class RAGAgent:
     def __init__(self, vectorstore_service: Optional[VectorStoreService] = None):

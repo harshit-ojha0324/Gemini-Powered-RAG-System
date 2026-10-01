@@ -7,6 +7,10 @@ import shutil
 from datetime import datetime
 import json
 from pathlib import Path
+from dotenv import load_dotenv
+
+# Load backend/.env before the services below read their settings.
+load_dotenv()
 
 from agents.rag_agent import RAGAgent
 from security.pii_detector import PIIDetector

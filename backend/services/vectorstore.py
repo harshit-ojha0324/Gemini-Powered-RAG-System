@@ -1,6 +1,5 @@
 import os
 from typing import List, Optional
-from dotenv import load_dotenv
 
 # Chroma's anonymized telemetry is off unless the environment turns it on.
 os.environ.setdefault("ANONYMIZED_TELEMETRY", "False")
@@ -8,8 +7,6 @@ os.environ.setdefault("ANONYMIZED_TELEMETRY", "False")
 from langchain_community.vectorstores import Chroma
 from langchain.schema import Document
 from services.embedding_fallback import FallbackEmbeddings
-
-load_dotenv()
 
 class VectorStoreService:
     def __init__(self):

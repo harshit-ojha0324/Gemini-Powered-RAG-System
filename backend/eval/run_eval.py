@@ -27,6 +27,8 @@ threshold, so it can gate CI.
 import argparse
 import sys
 
+from dotenv import load_dotenv
+
 from eval.corpus import CORPUS
 from eval.dataset import GOLD
 from eval.metrics import (
@@ -134,6 +136,7 @@ def _make_generator():
 
 
 def main():
+    load_dotenv()
     ap = argparse.ArgumentParser(description="RAG retrieval & grounding eval")
     ap.add_argument("--k", type=int, default=4)
     ap.add_argument("--threshold", type=float, default=0.7)
