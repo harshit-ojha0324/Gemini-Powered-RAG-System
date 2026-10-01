@@ -168,18 +168,3 @@ class DocumentProcessor:
 
         except Exception as e:
             raise Exception(f"Error processing PDF: {str(e)}")
-
-    def extract_metadata(self, file_path: str) -> dict:
-        """Extract metadata from PDF"""
-        try:
-            reader = PdfReader(file_path)
-            metadata = reader.metadata
-
-            return {
-                "title": metadata.get("/Title", "Unknown"),
-                "author": metadata.get("/Author", "Unknown"),
-                "pages": len(reader.pages),
-                "file_size": os.path.getsize(file_path)
-            }
-        except Exception as e:
-            return {"error": str(e)}

@@ -44,10 +44,6 @@ class VectorStoreService:
             search_kwargs={"k": k}
         )
     
-    def similarity_search(self, query: str, k: int = 4) -> List[Document]:
-        """Search for similar documents"""
-        return self.vectorstore.similarity_search(query, k=k)
-    
     def delete_document(self, source: str):
         """Delete documents by source"""
         try:
@@ -57,12 +53,3 @@ class VectorStoreService:
                 self.vectorstore.persist()
         except Exception as e:
             raise Exception(f"Error deleting documents: {str(e)}")
-    
-    def clear_all(self):
-        """Clear all documents from vectorstore"""
-        self.vectorstore.delete_collection()
-        self.vectorstore = Chroma(
-            persist_directory=self.persist_directory,
-            embedding_function=self.embeddings,
-            collection_name="documents"
-        )

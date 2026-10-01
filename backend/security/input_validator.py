@@ -68,23 +68,5 @@ class InputValidator:
         
         return {
             "is_valid": is_valid,
-            "warnings": warnings,
-            "text_length": len(text)
+            "warnings": warnings
         }
-    
-    def sanitize(self, text: str) -> str:
-        """Sanitize input by removing dangerous patterns"""
-        text = re.sub(r'<[^>]+>', '', text)
-        text = re.sub(r'<script[^>]*>.*?</script>', '', text, flags=re.DOTALL | re.IGNORECASE)
-        
-        dangerous_patterns = [
-            r'javascript:',
-            r'onerror\s*=',
-            r'onload\s*=',
-            r'eval\('
-        ]
-        
-        for pattern in dangerous_patterns:
-            text = re.sub(pattern, '', text, flags=re.IGNORECASE)
-        
-        return text.strip()
