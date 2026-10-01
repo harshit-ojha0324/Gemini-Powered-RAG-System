@@ -9,6 +9,7 @@ function App() {
   const [activeTab, setActiveTab] = useState('chat');
   const [documents, setDocuments] = useState([]);
   const [stats, setStats] = useState(null);
+  const [apiUp, setApiUp] = useState(true); // follows the stats poll
   const [sidebarOpen, setSidebarOpen] = useState(true);
 
   useEffect(() => {
@@ -31,7 +32,9 @@ function App() {
     try {
       const data = await api('/api/stats');
       setStats(data.statistics);
+      setApiUp(true);
     } catch (error) {
+      setApiUp(false);
       console.error('Error loading stats:', error);
     }
   };
@@ -172,8 +175,8 @@ function App() {
               </span>
             )}
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <div style={{ width: '7px', height: '7px', background: '#22c55e', borderRadius: '50%' }} />
-              <span style={{ fontSize: '12px', color: '#6b7280' }}>API connected</span>
+              <div style={{ width: '7px', height: '7px', background: apiUp ? '#22c55e' : '#ef4444', borderRadius: '50%' }} />
+              <span style={{ fontSize: '12px', color: '#6b7280' }}>{apiUp ? 'API connected' : 'API unreachable'}</span>
             </div>
           </div>
         </header>
