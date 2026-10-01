@@ -42,3 +42,14 @@ def test_security_logs():
     data = response.json()
     assert "logs" in data
     assert "count" in data
+
+def test_security_logs_are_newest_first_and_limited(tmp_path, monkeypatch):
+    import json
+    import app as app_module
+    log_file = tmp_path / "security_log.jsonl"
+    log_file.write_text("".join(json.dumps({"query": q}) + "\n" for q in ["a", "b", "c"]))
+    monkeypatch.setattr(app_module, "LOG_FILE", log_file)
+
+    data = client.get("/api/security/logs?limit=2").json()
+    assert [entry["query"] for entry in data["logs"]] == ["c", "b"]
+    assert client.get("/api/security/logs?limit=0").status_code == 422

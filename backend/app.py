@@ -1,9 +1,8 @@
-from fastapi import FastAPI, UploadFile, File, HTTPException, BackgroundTasks
+from fastapi import FastAPI, UploadFile, File, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from typing import List, Optional
-import os
+from collections import deque
 import shutil
 from datetime import datetime
 import json
@@ -42,7 +41,8 @@ document_processor = DocumentProcessor(embeddings=vectorstore_service.embeddings
 # Ensure directories exist
 DOCUMENTS_DIR = Path("./data/documents").resolve()
 DOCUMENTS_DIR.mkdir(parents=True, exist_ok=True)
-Path("./data/logs").mkdir(parents=True, exist_ok=True)
+LOG_FILE = Path("./data/logs/security_log.jsonl")
+LOG_FILE.parent.mkdir(parents=True, exist_ok=True)
 
 
 def resolve_document_path(filename: str) -> Path:
@@ -74,7 +74,6 @@ class QueryResponse(BaseModel):
 # Global stats
 stats = {
     "total_queries": 0,
-    "total_documents": 0,
     "security_incidents": 0,
     "pii_detections": 0
 }
@@ -89,9 +88,7 @@ def log_security_incident(query: str, flags: List[str], pii_found: bool):
     }
     
     try:
-        log_file = Path("./data/logs/security_log.jsonl")
-        log_file.parent.mkdir(parents=True, exist_ok=True)
-        with open(log_file, "a") as f:
+        with open(LOG_FILE, "a") as f:
             f.write(json.dumps(log_entry) + "\n")
     except Exception:
         pass  # Don't let logging failures break the request
@@ -119,9 +116,7 @@ async def upload_document(file: UploadFile = File(...)):
 
         documents = document_processor.process_pdf(str(resolved))
         vectorstore_service.add_documents(documents, safe_name)
-        
-        stats["total_documents"] += 1
-        
+
         return {
             "message": "Document uploaded and processed successfully",
             "filename": safe_name,
@@ -171,14 +166,13 @@ async def query_documents(request: QueryRequest):
 async def list_documents():
     """List all uploaded documents"""
     try:
-        docs_dir = Path("./data/documents")
         documents = [
             {
                 "filename": f.name,
                 "size": f.stat().st_size,
                 "uploaded_at": datetime.fromtimestamp(f.stat().st_mtime).isoformat()
             }
-            for f in docs_dir.glob("*.pdf")
+            for f in DOCUMENTS_DIR.glob("*.pdf")
         ]
         return {"documents": documents, "count": len(documents)}
     except Exception as e:
@@ -192,7 +186,6 @@ async def delete_document(filename: str):
         if file_path.exists():
             file_path.unlink()
             vectorstore_service.delete_document(file_path.name)
-            stats["total_documents"] -= 1
             return {"message": "Document deleted successfully"}
         else:
             raise HTTPException(status_code=404, detail="Document not found")
@@ -204,28 +197,20 @@ async def delete_document(filename: str):
 @app.get("/api/stats")
 async def get_statistics():
     """Get system statistics"""
-    actual_doc_count = len(list(Path("./data/documents").glob("*.pdf")))
     return {
-        "statistics": {**stats, "total_documents": actual_doc_count},
+        "statistics": {**stats, "total_documents": len(list(DOCUMENTS_DIR.glob("*.pdf")))},
         "timestamp": datetime.now().isoformat()
     }
 
 @app.get("/api/security/logs")
-async def get_security_logs(limit: int = 50):
-    """Get recent security logs"""
+async def get_security_logs(limit: int = Query(50, ge=1)):
+    """Get the most recent security logs, newest first"""
     try:
-        log_file = Path("./data/logs/security_log.jsonl")
-        if not log_file.exists():
+        if not LOG_FILE.exists():
             return {"logs": [], "count": 0}
-        
-        logs = []
-        with open(log_file, "r") as f:
-            for line in f:
-                logs.append(json.loads(line))
-        
-        logs = logs[-limit:]
-        logs.reverse()
-        
+
+        with open(LOG_FILE) as f:
+            logs = [json.loads(line) for line in deque(f, maxlen=limit)][::-1]
         return {"logs": logs, "count": len(logs)}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
