@@ -1,6 +1,7 @@
 """Metric helpers for the RAG retrieval & grounding eval."""
-import math
 from typing import Any, Dict, List, Tuple
+
+from services.document_processor import cosine
 
 _ABSTAIN_MARKERS = [
     "don't have enough information", "do not have enough information",
@@ -8,15 +9,6 @@ _ABSTAIN_MARKERS = [
     "not in the documents", "don't know", "do not know", "unable to answer",
     "no relevant information",
 ]
-
-
-def cosine(a: List[float], b: List[float]) -> float:
-    dot = sum(x * y for x, y in zip(a, b))
-    na = math.sqrt(sum(x * x for x in a))
-    nb = math.sqrt(sum(y * y for y in b))
-    if na == 0 or nb == 0:
-        return 0.0
-    return dot / (na * nb)
 
 
 class InMemoryRetriever:
