@@ -386,7 +386,6 @@ llm-document-agent/
 │   │   ├── document_processor.py  # PDF parsing and text chunking
 │   │   ├── vectorstore.py         # Chroma vector DB wrapper
 │   │   ├── embedding_fallback.py  # Gemini/HuggingFace embedding with fallback
-│   │   ├── llm_service.py         # LLM service abstraction
 │   │   └── telemetry_shim.py      # Chroma telemetry compatibility shim
 │   ├── security/
 │   │   ├── pii_detector.py        # PII detection (Presidio + regex)
