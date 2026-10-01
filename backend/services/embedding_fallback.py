@@ -8,66 +8,36 @@ load_dotenv()
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# List of known-good Gemini embedding models
-KNOWN_GOOD_MODELS = [
-    "models/embedding-001",
-    "models/text-embedding-004",
-]
-
-# Known problematic models to avoid
-PROBLEMATIC_MODELS = [
-    "models/gemini-2.0-flash-exp",
-    "models/gemini-pro",
-]
-
 
 class FallbackEmbeddings:
     """
     Embedding service that tries Gemini first, falls back to local HuggingFace embeddings.
     Lazy loads HuggingFace only when needed to avoid startup issues.
-    Includes model validation to catch NotFound errors early and suggest alternatives.
     """
     def __init__(self) -> None:
-        self.gemini_api_key: Optional[str] = os.getenv("GEMINI_API_KEY")
         self.use_fallback: bool = False
         self.fallback_embeddings: Optional[Any] = None  # Lazy load
         self.primary_embeddings: Optional[GoogleGenerativeAIEmbeddings] = None
-        
-        # Primary: Gemini embeddings — model can be overridden via GEMINI_MODEL
+        # Primary: Gemini embeddings — model can be overridden via GEMINI_MODEL.
+        # Construction makes no API call: it only fails when no key is set. A bad
+        # model or key shows up on the first embed, which then switches to local.
         self.primary_model = os.getenv("GEMINI_MODEL") or "models/embedding-001"
-        
-        # Validate model choice
-        if self.primary_model in PROBLEMATIC_MODELS:
-            logger.warning(f"⚠️ Model '{self.primary_model}' is known to be unavailable for embeddings. Using fallback.")
+        try:
+            self.primary_embeddings = GoogleGenerativeAIEmbeddings(  # type: ignore[call-arg]
+                model=self.primary_model,
+                google_api_key=os.getenv("GEMINI_API_KEY")
+            )
+        except Exception as e:
+            logger.warning(f"⚠️ Gemini embeddings unavailable, using local fallback: {e}")
             self.use_fallback = True
-        elif self.primary_model not in KNOWN_GOOD_MODELS and not self.primary_model.startswith("models/"):
-            logger.warning(f"⚠️ Model '{self.primary_model}' may not be valid. Known good models: {', '.join(KNOWN_GOOD_MODELS)}")
-        
-        if not self.use_fallback:
-            try:
-                logger.info(f"Trying Gemini embeddings model: {self.primary_model}")
-                self.primary_embeddings = GoogleGenerativeAIEmbeddings(  # type: ignore
-                    model=self.primary_model,
-                    google_api_key=self.gemini_api_key
-                )
-                logger.info("✅ Gemini embeddings initialized")
-            except Exception as e:
-                error_msg = str(e)
-                # Check for NotFound or model availability errors
-                if "404" in error_msg or "notfound" in error_msg.lower() or "not found" in error_msg.lower():
-                    logger.warning(f"⚠️ Model '{self.primary_model}' not available (404). Available models: {', '.join(KNOWN_GOOD_MODELS)}")
-                    logger.info(f"💡 Tip: Set GEMINI_MODEL='{KNOWN_GOOD_MODELS[0]}' to use a known-good model")
-                else:
-                    logger.warning(f"⚠️ Gemini embeddings failed to initialize (model={self.primary_model}): {e}")
-                self.use_fallback = True
-    
+
     def _load_fallback(self):
         """Lazy load fallback embeddings only when needed"""
         if self.fallback_embeddings is None:
             try:
                 logger.info("📦 Loading fallback embeddings (HuggingFace)...")
                 from langchain_community.embeddings import HuggingFaceEmbeddings
-                
+
                 self.fallback_embeddings = HuggingFaceEmbeddings(
                     model_name="sentence-transformers/all-MiniLM-L6-v2",
                     model_kwargs={'device': 'cpu'},
@@ -75,116 +45,46 @@ class FallbackEmbeddings:
                 )
                 logger.info("✅ Fallback embeddings loaded successfully")
             except Exception as e:
-                logger.error(f"❌ Failed to load fallback embeddings: {e}")
-                # DummyEmbeddings produces dimensionally-valid vectors with no
-                # semantic signal, so an index built on it fails *silently* —
-                # retrieval returns confident nonsense instead of an error.
-                # Refuse by default; it is opt-in for offline tests only.
-                if os.getenv("ALLOW_DUMMY_EMBEDDINGS", "").lower() in {"1", "true", "yes"}:
-                    logger.warning(
-                        "⚠️ ALLOW_DUMMY_EMBEDDINGS is set — using signal-free dummy "
-                        "embeddings. Retrieval results are meaningless."
-                    )
-                    self.fallback_embeddings = DummyEmbeddings()
-                else:
-                    raise RuntimeError(
-                        "No usable embedding model: Gemini is unavailable and the local "
-                        "HuggingFace fallback failed to load. Refusing to build an index "
-                        "with signal-free dummy vectors. Set ALLOW_DUMMY_EMBEDDINGS=true "
-                        "to override for offline testing."
-                    ) from e
-    
+                # Never substitute placeholder vectors: an index built on them
+                # fails silently, returning confident nonsense instead of an error.
+                raise RuntimeError(
+                    "No usable embedding model: Gemini is unavailable and the local "
+                    "HuggingFace fallback failed to load."
+                ) from e
+
     @property
     def mode(self) -> str:
-        """Which embedding backend is live: 'gemini', 'local', or 'dummy'."""
-        if not self.use_fallback and self.primary_embeddings is not None:
-            return "gemini"
-        if isinstance(self.fallback_embeddings, DummyEmbeddings):
-            return "dummy"
-        return "local"
+        """Which embedding backend is live: 'gemini' or 'local'."""
+        return "gemini" if self._primary_live else "local"
+
+    @property
+    def _primary_live(self) -> bool:
+        return not self.use_fallback and self.primary_embeddings is not None
 
     @property
     def is_degraded(self) -> bool:
         """True when answers are not backed by the primary embedding model."""
         return self.mode != "gemini"
 
-    def embed_documents(self, texts: List[str]) -> List[List[float]]:
-        """Embed a list of documents"""
-        if not self.use_fallback and self.primary_embeddings is not None:
+    def _embed(self, method: str, arg: Any) -> Any:
+        if self._primary_live:
             try:
-                logger.info("🔄 Using Gemini embeddings...")
-                return self.primary_embeddings.embed_documents(texts)
+                return getattr(self.primary_embeddings, method)(arg)
             except Exception as e:
-                error_msg = str(e)
-                if "429" in error_msg or "quota" in error_msg.lower():
-                    logger.warning("⚠️ Gemini quota exceeded, switching to fallback")
-                    self.use_fallback = True
-                else:
-                    logger.error(f"❌ Gemini embedding error: {e}")
-                    self.use_fallback = True
-        
-        # Use fallback
-        logger.info("🔄 Using fallback embeddings...")
+                # Quota (429), bad key or bad model: switch to the local model
+                # until /api/reset-embeddings.
+                logger.warning(f"⚠️ Gemini embeddings failed, switching to fallback: {e}")
+                self.use_fallback = True
         self._load_fallback()
-        if self.fallback_embeddings is not None:
-            return self.fallback_embeddings.embed_documents(texts)
-        raise RuntimeError("No embedding backend available")
+        return getattr(self.fallback_embeddings, method)(arg)
+
+    def embed_documents(self, texts: List[str]) -> List[List[float]]:
+        return self._embed("embed_documents", texts)
+
+    def embed_query(self, text: str) -> List[float]:
+        return self._embed("embed_query", text)
 
     def reset_to_primary(self):
         """Reset to attempt Gemini embeddings again (call after quota recovery)"""
         self.use_fallback = False
-        self.fallback_embeddings = None
         logger.info("🔄 Reset to primary (Gemini) embeddings")
-
-    def embed_query(self, text: str) -> List[float]:
-        """Embed a query"""
-        if not self.use_fallback and self.primary_embeddings is not None:
-            try:
-                return self.primary_embeddings.embed_query(text)
-            except Exception as e:
-                error_msg = str(e)
-                if "429" in error_msg or "quota" in error_msg.lower():
-                    logger.warning("⚠️ Gemini quota exceeded, switching to fallback")
-                    self.use_fallback = True
-                else:
-                    logger.error(f"❌ Gemini embedding error: {e}")
-                    self.use_fallback = True
-        
-        # Use fallback
-        self._load_fallback()
-        if self.fallback_embeddings is not None:
-            return self.fallback_embeddings.embed_query(text)
-        raise RuntimeError("No embedding backend available")
-
-
-class DummyEmbeddings:
-    """Dummy embeddings as absolute fallback if everything fails"""
-    def embed_documents(self, texts: List[str]) -> List[List[float]]:
-        """Return dummy embeddings (384 dimensions for compatibility)"""
-        import hashlib
-        import struct
-        
-        embeddings = []
-        for text in texts:
-            # Create deterministic embeddings from text hash
-            hash_obj = hashlib.sha256(text.encode())
-            hash_bytes = hash_obj.digest()
-            
-            # Convert to 384 floats (common embedding size)
-            embedding = []
-            for i in range(0, len(hash_bytes), 4):
-                chunk = hash_bytes[i:i+4].ljust(4, b'\0')
-                val = struct.unpack('f', chunk)[0] if len(chunk) == 4 else 0.0
-                embedding.append(val)
-            
-            # Pad to 384 dimensions
-            while len(embedding) < 384:
-                embedding.append(0.0)
-            
-            embeddings.append(embedding[:384])
-        
-        return embeddings
-    
-    def embed_query(self, text: str) -> List[float]:
-        """Return dummy embedding for query"""
-        return self.embed_documents([text])[0]

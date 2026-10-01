@@ -10,7 +10,7 @@ from fastapi.testclient import TestClient
 
 import app as app_module
 from app import app, resolve_document_path, DOCUMENTS_DIR
-from services.embedding_fallback import DummyEmbeddings, FallbackEmbeddings
+from services.embedding_fallback import FallbackEmbeddings
 
 client = TestClient(app)
 
@@ -100,24 +100,32 @@ def _fallback_with_broken_local_model(monkeypatch):
     return embeddings
 
 
-def test_dummy_embeddings_are_refused_by_default(monkeypatch):
-    monkeypatch.delenv("ALLOW_DUMMY_EMBEDDINGS", raising=False)
+def test_broken_local_model_raises_instead_of_faking_vectors(monkeypatch):
     embeddings = _fallback_with_broken_local_model(monkeypatch)
-    with pytest.raises(RuntimeError, match="dummy vectors"):
+    with pytest.raises(RuntimeError, match="No usable embedding model"):
         embeddings.embed_query("anything")
 
 
-def test_dummy_embeddings_available_only_when_opted_in(monkeypatch):
-    monkeypatch.setenv("ALLOW_DUMMY_EMBEDDINGS", "true")
-    embeddings = _fallback_with_broken_local_model(monkeypatch)
-    embeddings.embed_query("anything")
-    assert isinstance(embeddings.fallback_embeddings, DummyEmbeddings)
-    assert embeddings.mode == "dummy"
-    assert embeddings.is_degraded
+def test_gemini_failure_switches_to_local_model():
+    class Gemini:
+        def embed_query(self, text):
+            raise RuntimeError("429 quota exceeded")
+
+    class Local:
+        def embed_query(self, text):
+            return [1.0]
+
+    embeddings = FallbackEmbeddings()
+    embeddings.primary_embeddings = Gemini()
+    embeddings.fallback_embeddings = Local()
+    assert embeddings.embed_query("anything") == [1.0]
+    assert embeddings.mode == "local" and embeddings.is_degraded
+    embeddings.reset_to_primary()
+    assert embeddings.mode == "gemini"
 
 
 def test_health_reports_embedding_mode():
     response = client.get("/api/health")
     assert response.status_code == 200
     services = response.json()["services"]
-    assert services["embedding_mode"] in {"gemini", "local", "dummy"}
+    assert services["embedding_mode"] in {"gemini", "local"}
