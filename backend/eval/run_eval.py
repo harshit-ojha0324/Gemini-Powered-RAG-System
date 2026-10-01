@@ -8,8 +8,9 @@ Measures the two properties the project claims:
                              the retrieved context; for out-of-scope questions,
                              does the system correctly ABSTAIN instead of guessing?
 
-By default it runs fully offline on the local MiniLM fallback embeddings (no API
-key needed), scoring the answer side with a retrieval-grounding proxy: an answer
+It embeds with the app's configured model (EMBEDDING_MODEL), so with no
+GEMINI_API_KEY, or EMBEDDING_MODEL=local, it runs fully offline on the local
+MiniLM model. It scores the answer side with a retrieval-grounding proxy: an answer
 is "grounded" iff the gold fact is present in the retrieved context, and an
 out-of-scope question is handled correctly iff retrieval finds nothing strongly
 relevant (so the model will abstain).
@@ -41,9 +42,9 @@ from eval.metrics import (
 
 
 def run(k=4, threshold=0.7, abstain_threshold=0.35, generate=False):
-    from services.embedding_fallback import FallbackEmbeddings
+    from services.embeddings import load_embeddings
 
-    embeddings = FallbackEmbeddings()
+    embeddings, _ = load_embeddings()
     retriever = InMemoryRetriever(embeddings, CORPUS)
 
     gen = None

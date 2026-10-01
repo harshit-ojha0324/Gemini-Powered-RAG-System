@@ -29,7 +29,7 @@ LLM Document Agent enables intelligent question-answering over your PDF document
 
 The system uses a RAG pipeline:
 1. PDFs are parsed and split into **semantically-coherent chunks** (sentences are embedded and split at topic-shift breakpoints, with a recursive-character fallback)
-2. Chunks are embedded into a vector database (Chroma) using Google Gemini embeddings
+2. Chunks are embedded into a vector database (Chroma) using Google Gemini embeddings, or an offline sentence-transformers model (chosen once at startup)
 3. At query time, semantically similar chunks are retrieved and passed to the LLM as context
 4. Gemini Flash generates a grounded, accurate response
 
@@ -46,7 +46,7 @@ Conversation history is maintained so you can ask follow-up questions naturally.
 - **RAG-Powered Q&A** — Contextual answers from Google Gemini, grounded in your documents
 - **Source Attribution** — Every answer links back to the source document and page number
 - **Conversation Memory** — Multi-turn conversations with maintained chat history
-- **Embedding Fallback** — Automatically falls back to HuggingFace embeddings if Gemini quota is exceeded
+- **Gemini or Local Embeddings** — Gemini embeddings by default, or an offline sentence-transformers model with `EMBEDDING_MODEL=local`. Each model keeps its own index, rebuilt from your PDFs at startup, so switching models never mixes their vectors
 
 ### Security
 - **PII Detection** — Identifies emails, phone numbers, SSNs, and credit card numbers using Microsoft Presidio (with regex fallback)
@@ -115,7 +115,7 @@ Conversation history is maintained so you can ask follow-up questions naturally.
 | Frontend | React 18, Vite, Lucide React |
 | Backend | Python 3.9+, FastAPI, Uvicorn |
 | LLM | Google Gemini Flash, via the `gemini-flash-latest` alias (`langchain-google-genai`) |
-| Embeddings | Gemini Embeddings (HuggingFace fallback) |
+| Embeddings | Gemini `gemini-embedding-001`, or local `all-MiniLM-L6-v2` (sentence-transformers) |
 | Vector Store | ChromaDB 0.4 |
 | LLM Orchestration | LangChain 0.1 |
 | PDF Parsing | PyPDF 4.0 |
@@ -199,9 +199,11 @@ All configuration is managed via environment variables. Copy `.env.example` to `
 | Variable | Default | Description |
 |---|---|---|
 | `GEMINI_API_KEY` | *(required)* | Your Google Gemini API key |
-| `GEMINI_MODEL` | `models/gemini-embedding-001` | Gemini **embedding** model (the generation model is `CHAT_MODEL` in `rag_agent.py`, not controlled by this variable) |
+| `EMBEDDING_MODEL` | Gemini `models/gemini-embedding-001` if `GEMINI_API_KEY` is set, otherwise `local` | `local` for the offline sentence-transformers model, or a Gemini embedding model name. Read once at startup (the answer-generating model is `CHAT_MODEL` in `rag_agent.py`) |
 | `CHROMA_PERSIST_DIRECTORY` | `./data/vectorstore` | Path to persist the Chroma vector DB |
 | `ANONYMIZED_TELEMETRY` | `False` | Chroma anonymized telemetry (off unless set to `True`) |
+
+**Choosing the embedding model.** The embedding model is fixed for the life of the process, because vectors from different models can't share an index (Gemini's are 3072-dimensional, the local model's 384). Each model gets its own Chroma collection (`documents-<model>`), and at startup the app reconciles that collection with the PDFs in `data/documents`: files it hasn't indexed yet are embedded, and chunks of files deleted since are dropped. Switching models is therefore just a restart; the first start on a model embeds your existing library once. `GET /api/health` reports which model is active.
 
 ---
 
@@ -228,7 +230,6 @@ All configuration is managed via environment variables. Copy `.env.example` to `
 | Method | Endpoint | Description |
 |---|---|---|
 | `GET` | `/api/security/logs` | Retrieve security incident logs (last 50 by default) |
-| `POST` | `/api/reset-embeddings` | Reset to Gemini embeddings after quota recovery |
 
 #### Query Request Body
 
@@ -336,7 +337,7 @@ make eval
 # or: cd backend && python -m eval.run_eval --k 4 --threshold 0.7
 ```
 
-It reports **context relevance** (does retrieval surface the passage that holds the answer?) and **grounded-response rate** (are answerable questions answered from context, and are out-of-scope questions correctly abstained on?). It runs offline on the local MiniLM embeddings — no API key needed — and gates on a threshold so it can run in CI. Add `--generate` with a valid `GEMINI_API_KEY` to score answer faithfulness on the model's real responses.
+It reports **context relevance** (does retrieval surface the passage that holds the answer?) and **grounded-response rate** (are answerable questions answered from context, and are out-of-scope questions correctly abstained on?). It embeds with the app's configured model, so with no `GEMINI_API_KEY` (or with `EMBEDDING_MODEL=local`) it runs fully offline, and it gates on a threshold so it can run in CI. Add `--generate` with a valid `GEMINI_API_KEY` to score answer faithfulness on the model's real responses.
 
 ---
 
@@ -351,7 +352,7 @@ llm-document-agent/
 │   ├── services/
 │   │   ├── document_processor.py  # PDF parsing and text chunking
 │   │   ├── vectorstore.py         # Chroma vector DB wrapper
-│   │   └── embedding_fallback.py  # Gemini/HuggingFace embedding with fallback
+│   │   └── embeddings.py          # Picks the Gemini or local embedding model
 │   ├── security/
 │   │   ├── pii_detector.py        # PII detection (Presidio + regex)
 │   │   ├── input_validator.py     # Prompt-injection detection
@@ -375,7 +376,7 @@ llm-document-agent/
 │
 ├── data/
 │   ├── documents/                 # Uploaded PDFs (persisted)
-│   ├── vectorstore/               # Chroma vector database (persisted)
+│   ├── vectorstore/               # Chroma vector database, one collection per embedding model
 │   └── logs/                     # Security event logs (persisted)
 │
 ├── docker-compose.yml
@@ -389,7 +390,7 @@ llm-document-agent/
 
 **Gemini API quota exceeded**
 
-The embedding service will automatically fall back to HuggingFace sentence-transformers. Once your quota resets, call `POST /api/reset-embeddings` to switch back to Gemini embeddings.
+Gemini calls fail until the quota resets: an upload returns the error, and a question gets an error answer. The app does not silently switch embedding models mid-run, because the local model's vectors can't be searched against an index built with Gemini's. To keep indexing and retrieving without Gemini embeddings, set `EMBEDDING_MODEL=local` in `backend/.env` and restart; your PDFs are embedded into the local model's own index at startup. Switch back the same way; the Gemini index is still there and catches up on anything uploaded in between. Answers are still generated by Gemini, so the chat model needs quota either way.
 
 **spaCy model not found**
 

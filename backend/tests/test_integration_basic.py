@@ -1,5 +1,5 @@
-"""Regression tests for the Tier-0 hardening: path containment, a single
-vector-store instance, and a loud (never silent) embedding failure."""
+"""Regression tests for path containment, upload handling, PII redaction, and
+one embedding model per index."""
 
 import os
 from pathlib import Path
@@ -10,7 +10,6 @@ from fastapi.testclient import TestClient
 
 import app as app_module
 from app import app, resolve_document_path, DOCUMENTS_DIR
-from services.embedding_fallback import FallbackEmbeddings
 
 client = TestClient(app)
 
@@ -147,8 +146,7 @@ def test_uppercase_extension_uploads_and_lists():
 # --- one vector store -------------------------------------------------------
 
 def test_agent_and_api_share_one_vectorstore():
-    """Two instances made /api/reset-embeddings report success on a store
-    the query path never reads."""
+    """Queries must read the store (and embedding model) uploads write to."""
     assert app_module.rag_agent.vectorstore_service is app_module.vectorstore_service
 
 
@@ -188,47 +186,60 @@ def test_history_sent_to_the_llm_is_bounded(monkeypatch):
     assert all(len(m.content) <= 10_000 for m in sent)
 
 
-# --- embeddings fail loudly -------------------------------------------------
+# --- one embedding model per process, one index per model -------------------
 
-def _fallback_with_broken_local_model(monkeypatch):
+def test_embedding_model_is_chosen_once_from_config(monkeypatch):
     import langchain_community.embeddings as lc_embeddings
+    from services.embeddings import load_embeddings, LOCAL_MODEL, DEFAULT_GEMINI_MODEL
+    monkeypatch.setattr(lc_embeddings, "HuggingFaceEmbeddings", lambda **kwargs: "local-model")
 
-    def _explode(*args, **kwargs):
-        raise RuntimeError("simulated HuggingFace load failure")
+    monkeypatch.delenv("EMBEDDING_MODEL", raising=False)
+    monkeypatch.delenv("GEMINI_API_KEY", raising=False)
+    assert load_embeddings() == ("local-model", LOCAL_MODEL)  # no key: offline
 
-    monkeypatch.setattr(lc_embeddings, "HuggingFaceEmbeddings", _explode, raising=False)
-    embeddings = FallbackEmbeddings()
-    embeddings.use_fallback = True
-    embeddings.fallback_embeddings = None
-    return embeddings
+    monkeypatch.setenv("GEMINI_API_KEY", "test-key")
+    assert load_embeddings()[1] == DEFAULT_GEMINI_MODEL  # key: Gemini
 
-
-def test_broken_local_model_raises_instead_of_faking_vectors(monkeypatch):
-    embeddings = _fallback_with_broken_local_model(monkeypatch)
-    with pytest.raises(RuntimeError, match="No usable embedding model"):
-        embeddings.embed_query("anything")
+    monkeypatch.setenv("EMBEDDING_MODEL", "local")
+    assert load_embeddings() == ("local-model", LOCAL_MODEL)  # explicit choice wins
 
 
-def test_gemini_failure_switches_to_local_model():
-    class Gemini:
-        def embed_query(self, text):
-            raise RuntimeError("429 quota exceeded")
+def test_each_embedding_model_gets_its_own_index(tmp_path, monkeypatch):
+    """One shared collection raised InvalidDimensionException on every query
+    once a 384-d model met an index built with 768-d (or 3072-d) vectors."""
+    from langchain_community.embeddings import FakeEmbeddings
+    import services.vectorstore as vectorstore_module
+    monkeypatch.setenv("CHROMA_PERSIST_DIRECTORY", str(tmp_path))
 
-    class Local:
-        def embed_query(self, text):
-            return [1.0]
+    monkeypatch.setattr(vectorstore_module, "load_embeddings",
+                        lambda: (FakeEmbeddings(size=768), "models/gemini-like"))
+    first = vectorstore_module.VectorStoreService()
+    first.vectorstore.add_texts(["indexed by the first model"], metadatas=[{"source": "a.pdf"}])
 
-    embeddings = FallbackEmbeddings()
-    embeddings.primary_embeddings = Gemini()
-    embeddings.fallback_embeddings = Local()
-    assert embeddings.embed_query("anything") == [1.0]
-    assert embeddings.mode == "local" and embeddings.is_degraded
-    embeddings.reset_to_primary()
-    assert embeddings.mode == "gemini"
+    monkeypatch.setattr(vectorstore_module, "load_embeddings",
+                        lambda: (FakeEmbeddings(size=384), "local-like"))
+    second = vectorstore_module.VectorStoreService()
+    assert second.vectorstore.similarity_search("a question", k=1) == []
+    assert first.indexed_sources() == {"a.pdf"}
+    assert second.indexed_sources() == set()
 
 
-def test_health_reports_embedding_mode():
-    response = client.get("/api/health")
-    assert response.status_code == 200
-    services = response.json()["services"]
-    assert services["embedding_mode"] in {"gemini", "local"}
+def test_startup_sync_indexes_new_pdfs_and_drops_deleted_ones(tmp_path, monkeypatch):
+    docs = tmp_path / "documents"
+    docs.mkdir()
+    (docs / "kept.pdf").write_bytes(make_pdf("Parental leave is sixteen weeks."))
+    monkeypatch.setattr(app_module, "DOCUMENTS_DIR", docs)
+    store = app_module.vectorstore_service
+    store.vectorstore.add_texts(["stale chunk"], metadatas=[{"source": "gone.pdf"}])
+
+    try:
+        app_module.sync_index()
+        assert store.indexed_sources() == {"kept.pdf"}
+    finally:
+        store.delete_document("kept.pdf")
+
+
+def test_health_reports_the_embedding_model():
+    from services.embeddings import LOCAL_MODEL
+    services = client.get("/api/health").json()["services"]
+    assert services["embedding_model"] == LOCAL_MODEL  # conftest picks the local model

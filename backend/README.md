@@ -6,6 +6,6 @@ Chroma's anonymized telemetry is off by default (`services/vectorstore.py` sets 
 
 ## Gemini / Embeddings
 
-The Gemini embedding model is set by the `GEMINI_MODEL` environment variable (default `models/gemini-embedding-001`).
+`EMBEDDING_MODEL` picks the embedding model once, at startup: `local` for the offline sentence-transformers model, or a Gemini embedding model name. Unset, it is `models/gemini-embedding-001` when `GEMINI_API_KEY` is set and `local` otherwise.
 
-If the configured Gemini model is not available or initialization fails, the service automatically falls back to local HuggingFace embeddings.
+There is no runtime fallback between models: their vectors differ in size and space, so each model has its own Chroma collection, which `sync_index()` in `app.py` reconciles with the PDFs on disk at every startup.

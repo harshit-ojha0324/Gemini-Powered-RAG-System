@@ -8,11 +8,14 @@ import shutil
 import threading
 from datetime import datetime
 import json
+import logging
 from pathlib import Path
 from dotenv import load_dotenv
 
 # Load backend/.env before the services below read their settings.
 load_dotenv()
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 from agents.rag_agent import RAGAgent
 from security.pii_detector import PIIDetector
@@ -33,9 +36,8 @@ app.add_middleware(
 )
 
 # Initialize services.
-# One VectorStoreService for the whole process: the agent must query the same
-# instance the upload path writes to, or /api/reset-embeddings resets a store
-# nobody reads while queries keep serving vectors from a second, stale one.
+# One VectorStoreService for the whole process: the agent queries the same
+# store (and embedding model) the upload path writes to.
 vectorstore_service = VectorStoreService()
 rag_agent = RAGAgent(vectorstore_service=vectorstore_service)
 pii_detector = PIIDetector()
@@ -77,6 +79,30 @@ def resolve_document_path(filename: str) -> Path:
     if candidate.parent != DOCUMENTS_DIR:
         raise HTTPException(status_code=400, detail="Invalid filename")
     return candidate
+
+
+def sync_index():
+    """Make the active model's index match the PDFs on disk.
+
+    The PDFs are the source of truth and every embedding model has its own
+    index, so this indexes files the current one hasn't seen (e.g. after
+    switching EMBEDDING_MODEL) and drops chunks of files deleted since.
+    """
+    # ponytail: synchronous at startup; move to a background task if libraries get large.
+    on_disk = {f.name: f for f in pdf_files()}
+    indexed = vectorstore_service.indexed_sources()
+    for name in indexed - on_disk.keys():
+        vectorstore_service.delete_document(name)
+    for name in sorted(on_disk.keys() - indexed):
+        try:
+            vectorstore_service.add_documents(document_processor.process_pdf(str(on_disk[name])), name)
+            logger.info(f"Indexed {name} with {vectorstore_service.embedding_model}")
+        except Exception as e:
+            # Keep starting up; the file stays listed but unsearchable until re-uploaded.
+            logger.warning(f"Could not index {name}: {e}")
+
+
+sync_index()
 
 # Bounds on what one request can make us redact, embed and send to the LLM.
 MAX_QUESTION_CHARS = 10_000
@@ -260,26 +286,16 @@ def get_security_logs(limit: int = Query(50, ge=1)):
 @app.get("/api/health")
 async def health_check():
     """Health check endpoint"""
-    embeddings = vectorstore_service.embeddings
-    degraded = embeddings.is_degraded
     return {
-        "status": "degraded" if degraded else "healthy",
+        "status": "healthy",
         "timestamp": datetime.now().isoformat(),
         "services": {
             "rag_agent": "operational",
-            # A live embedding fallback silently changes what retrieval returns,
-            # so it has to be visible rather than only in the server logs.
-            "vector_store": "degraded" if degraded else "operational",
-            "embedding_mode": embeddings.mode,
+            "vector_store": "operational",
+            "embedding_model": vectorstore_service.embedding_model,
             "security": "operational"
         }
     }
-
-@app.post("/api/reset-embeddings")
-async def reset_embeddings():
-    """Reset to try Gemini embeddings again after quota reset"""
-    vectorstore_service.embeddings.reset_to_primary()
-    return {"message": "Reset to Gemini embeddings", "status": "success"}
 
 if __name__ == "__main__":
     import uvicorn

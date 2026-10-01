@@ -8,3 +8,5 @@ os.chdir(tempfile.mkdtemp(prefix="rag-tests-"))
 
 # The Gemini clients only need a key to exist; the tests never call Gemini.
 os.environ.setdefault("GEMINI_API_KEY", "test-key")
+# Offline, deterministic embeddings (the local model) for everything the app indexes.
+os.environ.setdefault("EMBEDDING_MODEL", "local")

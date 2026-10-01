@@ -12,8 +12,8 @@ _ABSTAIN_MARKERS = [
 
 
 class InMemoryRetriever:
-    """Cosine top-k retriever over the eval corpus, using the production
-    FallbackEmbeddings — the same embedding model the app indexes with, so the
+    """Cosine top-k retriever over the eval corpus, using the app's configured
+    embedding model (load_embeddings) — the one it indexes with, so the
     retrieval quality measured here reflects the real system."""
 
     def __init__(self, embeddings: Any, corpus: List[Dict]):

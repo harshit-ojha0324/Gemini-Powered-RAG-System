@@ -16,7 +16,7 @@ pydantic==2.5.3
 pytest==7.4.3
 httpx==0.26.0
 
-# Fallback embeddings - COMPATIBLE VERSIONS
+# Local embeddings (EMBEDDING_MODEL=local) - COMPATIBLE VERSIONS
 sentence-transformers==2.2.2
 huggingface-hub==0.16.4
 transformers==4.30.2
