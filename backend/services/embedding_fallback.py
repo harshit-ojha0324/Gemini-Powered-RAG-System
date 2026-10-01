@@ -3,7 +3,6 @@ from typing import List, Optional, Any
 import os
 from dotenv import load_dotenv
 import logging
-from config import settings
 
 load_dotenv()
 logging.basicConfig(level=logging.INFO)
@@ -34,8 +33,8 @@ class FallbackEmbeddings:
         self.fallback_embeddings: Optional[Any] = None  # Lazy load
         self.primary_embeddings: Optional[GoogleGenerativeAIEmbeddings] = None
         
-        # Primary: Gemini embeddings — model can be overridden via env or config
-        self.primary_model = os.getenv("GEMINI_MODEL") or getattr(settings, "gemini_model", "models/embedding-001")
+        # Primary: Gemini embeddings — model can be overridden via GEMINI_MODEL
+        self.primary_model = os.getenv("GEMINI_MODEL") or "models/embedding-001"
         
         # Validate model choice
         if self.primary_model in PROBLEMATIC_MODELS:

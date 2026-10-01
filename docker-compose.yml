@@ -11,8 +11,6 @@ services:
       - GEMINI_API_KEY=${GEMINI_API_KEY}
       - GEMINI_MODEL=models/gemini-2.0-flash-exp
       - CHROMA_PERSIST_DIRECTORY=/app/data/vectorstore
-      - DOCUMENTS_DIRECTORY=/app/data/documents
-      - LOGS_DIRECTORY=/app/data/logs
     volumes:
       - ./data:/app/data
       - ./backend:/app

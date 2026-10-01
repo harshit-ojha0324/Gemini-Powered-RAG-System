@@ -221,12 +221,7 @@ All configuration is managed via environment variables. Copy `.env.example` to `
 | `GEMINI_API_KEY` | *(required)* | Your Google Gemini API key |
 | `GEMINI_MODEL` | `models/embedding-001` | Gemini **embedding** model (the generation model is fixed to `gemini-2.0-flash` in `rag_agent.py`, not controlled by this variable) |
 | `CHROMA_PERSIST_DIRECTORY` | `./data/vectorstore` | Path to persist the Chroma vector DB |
-| `DOCUMENTS_DIRECTORY` | `./data/documents` | Path to store uploaded PDF files |
-| `LOGS_DIRECTORY` | `./data/logs` | Path to store security event logs |
-| `MAX_FILE_SIZE_MB` | `10` | Maximum allowed upload file size |
-| `ALLOWED_EXTENSIONS` | `pdf` | Comma-separated list of allowed file extensions |
 | `ANONYMIZED_TELEMETRY` | `False` | Chroma anonymized telemetry (off unless set to `True`) |
-| `DEBUG` | `true` | Enable debug mode |
 
 ---
 
@@ -392,7 +387,6 @@ llm-document-agent/
 │   │   └── content_filter.py      # Output sensitive data redaction
 │   ├── tests/                     # pytest test suite
 │   ├── app.py                     # FastAPI application and route definitions
-│   ├── config.py                  # Pydantic settings (reads from .env)
 │   └── requirements.txt
 │
 ├── frontend/
