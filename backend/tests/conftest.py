@@ -1,14 +1,10 @@
-import pytest
 import os
-from pathlib import Path
+import tempfile
 
-@pytest.fixture(scope="session", autouse=True)
-def setup_test_environment():
-    """Setup test environment"""
-    Path("./data/documents").mkdir(parents=True, exist_ok=True)
-    Path("./data/logs").mkdir(parents=True, exist_ok=True)
-    Path("./data/vectorstore").mkdir(parents=True, exist_ok=True)
-    
-    os.environ["GEMINI_API_KEY"] = os.getenv("GEMINI_API_KEY", "test-key")
-    
-    yield
+# Runs before any test module imports app, so every ./data path the app uses
+# (uploads, vector store, security log) lands in a throwaway directory instead
+# of backend/data, where a developer's real documents live.
+os.chdir(tempfile.mkdtemp(prefix="rag-tests-"))
+
+# The Gemini clients only need a key to exist; the tests never call Gemini.
+os.environ.setdefault("GEMINI_API_KEY", "test-key")
