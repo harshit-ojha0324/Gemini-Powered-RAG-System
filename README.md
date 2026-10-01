@@ -225,7 +225,7 @@ All configuration is managed via environment variables. Copy `.env.example` to `
 | `LOGS_DIRECTORY` | `./data/logs` | Path to store security event logs |
 | `MAX_FILE_SIZE_MB` | `10` | Maximum allowed upload file size |
 | `ALLOWED_EXTENSIONS` | `pdf` | Comma-separated list of allowed file extensions |
-| `CHROMA_TELEMETRY` | `false` | Enable/disable Chroma anonymized telemetry |
+| `ANONYMIZED_TELEMETRY` | `False` | Chroma anonymized telemetry (off unless set to `True`) |
 | `DEBUG` | `true` | Enable debug mode |
 
 ---
@@ -385,8 +385,7 @@ llm-document-agent/
 │   ├── services/
 │   │   ├── document_processor.py  # PDF parsing and text chunking
 │   │   ├── vectorstore.py         # Chroma vector DB wrapper
-│   │   ├── embedding_fallback.py  # Gemini/HuggingFace embedding with fallback
-│   │   └── telemetry_shim.py      # Chroma telemetry compatibility shim
+│   │   └── embedding_fallback.py  # Gemini/HuggingFace embedding with fallback
 │   ├── security/
 │   │   ├── pii_detector.py        # PII detection (Presidio + regex)
 │   │   ├── input_validator.py     # Injection and XSS detection
