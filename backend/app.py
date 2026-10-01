@@ -70,7 +70,6 @@ class QueryResponse(BaseModel):
     answer: str
     sources: List[dict]
     security_warnings: List[str]
-    metadata: dict
 
 # Global stats
 stats = {
@@ -160,12 +159,7 @@ async def query_documents(request: QueryRequest):
         return QueryResponse(
             answer=filtered_answer,
             sources=result["sources"],
-            security_warnings=security_warnings,
-            metadata={
-                "query_time": datetime.now().isoformat(),
-                "model": "gemini-2.0-flash-exp",
-                "chunks_retrieved": len(result["sources"])
-            }
+            security_warnings=security_warnings
         )
     
     except HTTPException:

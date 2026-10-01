@@ -46,8 +46,7 @@ function ChatInterface({ documents }) {
         role: 'assistant',
         content: data.answer,
         sources: data.sources,
-        warnings: data.security_warnings,
-        metadata: data.metadata
+        warnings: data.security_warnings
       };
 
       setMessages(prev => [...prev, assistantMessage]);

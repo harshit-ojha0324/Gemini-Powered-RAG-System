@@ -254,21 +254,25 @@ All configuration is managed via environment variables. Copy `.env.example` to `
 
 ```json
 {
-  "question": "What is the main topic of the document?",
-  "document_name": "optional-specific-document.pdf"
+  "question": "And how is it calculated?",
+  "conversation_history": [
+    { "role": "user", "content": "What is the main topic of the document?" },
+    { "role": "assistant", "content": "The document covers..." }
+  ]
 }
 ```
+
+`conversation_history` is optional; the backend keeps no session state.
 
 #### Query Response
 
 ```json
 {
-  "answer": "The document covers...",
+  "answer": "It is calculated as... (report.pdf, page 3)",
   "sources": [
-    { "document": "report.pdf", "page": 3 }
+    { "content": "First 200 characters of the chunk...", "page": 3, "source": "report.pdf" }
   ],
-  "security_flags": [],
-  "conversation_id": "abc123"
+  "security_warnings": []
 }
 ```
 

@@ -72,26 +72,22 @@ class RAGAgent:
             for doc in result.get("source_documents", []):
                 sources.append({
                     "content": doc.page_content[:200] + "...",
-                    "metadata": doc.metadata,
                     "page": doc.metadata.get("page", "N/A"),
                     "source": doc.metadata.get("source", "Unknown")
                 })
             
             return {
                 "answer": result["answer"],
-                "sources": sources,
-                "question": question
+                "sources": sources
             }
         
         except ResourceExhausted:
             return {
                 "answer": "Gemini API quota exceeded. The free tier daily limit has been reached. Please wait until midnight (Pacific Time) for the quota to reset, or use a new API key.",
-                "sources": [],
-                "question": question
+                "sources": []
             }
         except Exception as e:
             return {
                 "answer": f"I apologize, but I encountered an error: {str(e)}",
-                "sources": [],
-                "question": question
+                "sources": []
             }
