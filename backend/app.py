@@ -5,6 +5,7 @@ from typing import List, Optional
 from collections import deque
 import os
 import shutil
+import threading
 from datetime import datetime
 import json
 from pathlib import Path
@@ -49,6 +50,11 @@ DOCUMENTS_DIR.mkdir(parents=True, exist_ok=True)
 LOG_FILE = Path("./data/logs/security_log.jsonl")
 LOG_FILE.parent.mkdir(parents=True, exist_ok=True)
 MAX_UPLOAD_BYTES = 10 * 1024 * 1024
+# Routes that do blocking work (PDF parsing, Presidio, Chroma, Gemini) are
+# plain `def`, so FastAPI runs them in its threadpool instead of stalling the
+# event loop. Changes to one document's file + chunks must not interleave.
+# ponytail: one lock for all uploads/deletes; per-filename locks if uploads get busy.
+index_lock = threading.Lock()
 
 
 def pdf_files() -> List[Path]:
@@ -117,7 +123,7 @@ async def root():
     return {"message": "Smart Document Q&A Agent API", "status": "running"}
 
 @app.post("/api/upload")
-async def upload_document(file: UploadFile = File(...)):
+def upload_document(file: UploadFile = File(...)):
     """Upload and process a PDF document"""
     try:
         if not file.filename or not file.filename.lower().endswith(".pdf"):
@@ -135,14 +141,15 @@ async def upload_document(file: UploadFile = File(...)):
         # place once it is indexed: a PDF that fails to parse never shows up as
         # uploaded, and a failed re-upload leaves the previous version intact.
         partial = resolved.with_name(safe_name + ".part")
-        try:
-            with open(partial, "wb") as buffer:
-                shutil.copyfileobj(file.file, buffer)
-            documents = document_processor.process_pdf(str(partial))
-            vectorstore_service.add_documents(documents, safe_name)
-            os.replace(partial, resolved)
-        finally:
-            partial.unlink(missing_ok=True)
+        with index_lock:
+            try:
+                with open(partial, "wb") as buffer:
+                    shutil.copyfileobj(file.file, buffer)
+                documents = document_processor.process_pdf(str(partial))
+                vectorstore_service.add_documents(documents, safe_name)
+                os.replace(partial, resolved)
+            finally:
+                partial.unlink(missing_ok=True)
 
         return {
             "message": "Document uploaded and processed successfully",
@@ -157,7 +164,7 @@ async def upload_document(file: UploadFile = File(...)):
         raise HTTPException(status_code=500, detail=f"Error processing document: {str(e)}")
 
 @app.post("/api/query", response_model=QueryResponse)
-async def query_documents(request: QueryRequest):
+def query_documents(request: QueryRequest):
     """Query documents with security checks"""
     try:
         stats["total_queries"] += 1
@@ -198,7 +205,7 @@ async def query_documents(request: QueryRequest):
         raise HTTPException(status_code=500, detail=f"Error processing query: {str(e)}")
 
 @app.get("/api/documents")
-async def list_documents():
+def list_documents():
     """List all uploaded documents"""
     try:
         documents = [
@@ -214,23 +221,23 @@ async def list_documents():
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.delete("/api/documents/{filename}")
-async def delete_document(filename: str):
+def delete_document(filename: str):
     """Delete a document"""
     try:
         file_path = resolve_document_path(filename)
-        if file_path.exists():
+        with index_lock:
+            if not file_path.exists():
+                raise HTTPException(status_code=404, detail="Document not found")
             file_path.unlink()
             vectorstore_service.delete_document(file_path.name)
-            return {"message": "Document deleted successfully"}
-        else:
-            raise HTTPException(status_code=404, detail="Document not found")
+        return {"message": "Document deleted successfully"}
     except HTTPException:
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/api/stats")
-async def get_statistics():
+def get_statistics():
     """Get system statistics"""
     return {
         "statistics": {**stats, "total_documents": len(pdf_files())},
@@ -238,7 +245,7 @@ async def get_statistics():
     }
 
 @app.get("/api/security/logs")
-async def get_security_logs(limit: int = Query(50, ge=1)):
+def get_security_logs(limit: int = Query(50, ge=1)):
     """Get the most recent security logs, newest first"""
     try:
         if not LOG_FILE.exists():
