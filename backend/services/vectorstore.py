@@ -1,5 +1,5 @@
 import os
-from typing import List, Optional
+from typing import List
 
 # Chroma's anonymized telemetry is off unless the environment turns it on.
 os.environ.setdefault("ANONYMIZED_TELEMETRY", "False")
@@ -21,14 +21,18 @@ class VectorStoreService:
             collection_name="documents"
         )
     
-    def add_documents(self, documents: List[Document], source: Optional[str] = None) -> None:
-        """Add documents to the vector store"""
+    def add_documents(self, documents: List[Document], source: str) -> None:
+        """Index a document's chunks, replacing any previously indexed version"""
         try:
-            if source:
-                for doc in documents:
-                    doc.metadata["source"] = source
-            
+            for doc in documents:
+                doc.metadata["source"] = source
+
+            # Old chunks go only after the new ones are in, so a failed
+            # re-index leaves the previous version searchable.
+            old_ids = self.vectorstore.get(where={"source": source})["ids"]
             self.vectorstore.add_documents(documents)
+            if old_ids:
+                self.vectorstore.delete(ids=old_ids)
             self.vectorstore.persist()
         
         except Exception as e:

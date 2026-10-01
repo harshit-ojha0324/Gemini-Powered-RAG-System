@@ -121,6 +121,20 @@ def test_unparseable_pdf_is_not_listed_as_uploaded():
     assert "broken.pdf" not in listed_documents()
 
 
+def test_reupload_replaces_chunks_instead_of_duplicating_them():
+    def chunks():
+        return len(app_module.vectorstore_service.vectorstore.get(where={"source": "policy.pdf"})["ids"])
+
+    try:
+        for _ in range(2):
+            response = client.post("/api/upload", files={"file": ("policy.pdf", make_pdf("PTO is 20 days."), "application/pdf")})
+            assert response.status_code == 200
+        assert chunks() == response.json()["chunks"]
+    finally:
+        client.delete("/api/documents/policy.pdf")
+    assert chunks() == 0
+
+
 def test_uppercase_extension_uploads_and_lists():
     try:
         response = client.post("/api/upload", files={"file": ("REPORT.PDF", make_pdf("Revenue grew."), "application/pdf")})
