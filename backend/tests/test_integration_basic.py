@@ -77,6 +77,59 @@ def test_upload_never_writes_outside_documents_dir(hostile_name):
         contained.unlink(missing_ok=True)
 
 
+# --- upload validation ------------------------------------------------------
+
+def make_pdf(text: str) -> bytes:
+    """A minimal one-page PDF whose extracted text is `text`."""
+    stream = f"BT /F1 12 Tf 72 720 Td ({text}) Tj ET".encode()
+    objects = [
+        b"<</Type/Catalog/Pages 2 0 R>>",
+        b"<</Type/Pages/Kids[3 0 R]/Count 1>>",
+        b"<</Type/Page/Parent 2 0 R/MediaBox[0 0 612 792]/Contents 4 0 R"
+        b"/Resources<</Font<</F1 5 0 R>>>>>>",
+        b"<</Length %d>>stream\n%s\nendstream" % (len(stream), stream),
+        b"<</Type/Font/Subtype/Type1/BaseFont/Helvetica>>",
+    ]
+    out, offsets = b"%PDF-1.4\n", []
+    for number, body in enumerate(objects, 1):
+        offsets.append(len(out))
+        out += b"%d 0 obj\n%s\nendobj\n" % (number, body)
+    xref = len(out)
+    out += b"xref\n0 6\n0000000000 65535 f \n" + b"".join(b"%010d 00000 n \n" % o for o in offsets)
+    return out + b"trailer<</Size 6/Root 1 0 R>>\nstartxref\n%d\n%%%%EOF\n" % xref
+
+
+def listed_documents():
+    return {d["filename"] for d in client.get("/api/documents").json()["documents"]}
+
+
+def test_non_pdf_upload_is_a_400_not_a_500():
+    response = client.post("/api/upload", files={"file": ("notes.txt", b"hello", "text/plain")})
+    assert response.status_code == 400
+
+
+def test_oversized_upload_is_rejected():
+    big = b"%PDF-1.4\n" + b"0" * app_module.MAX_UPLOAD_BYTES
+    response = client.post("/api/upload", files={"file": ("big.pdf", big, "application/pdf")})
+    assert response.status_code == 413
+    assert "big.pdf" not in listed_documents()
+
+
+def test_unparseable_pdf_is_not_listed_as_uploaded():
+    response = client.post("/api/upload", files={"file": ("broken.pdf", b"%PDF-1.4 junk", "application/pdf")})
+    assert response.status_code == 500
+    assert "broken.pdf" not in listed_documents()
+
+
+def test_uppercase_extension_uploads_and_lists():
+    try:
+        response = client.post("/api/upload", files={"file": ("REPORT.PDF", make_pdf("Revenue grew."), "application/pdf")})
+        assert response.status_code == 200
+        assert "REPORT.PDF" in listed_documents()
+    finally:
+        client.delete("/api/documents/REPORT.PDF")
+
+
 # --- one vector store -------------------------------------------------------
 
 def test_agent_and_api_share_one_vectorstore():

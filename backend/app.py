@@ -3,6 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 from typing import List, Optional
 from collections import deque
+import os
 import shutil
 from datetime import datetime
 import json
@@ -47,6 +48,12 @@ DOCUMENTS_DIR = Path("./data/documents").resolve()
 DOCUMENTS_DIR.mkdir(parents=True, exist_ok=True)
 LOG_FILE = Path("./data/logs/security_log.jsonl")
 LOG_FILE.parent.mkdir(parents=True, exist_ok=True)
+MAX_UPLOAD_BYTES = 10 * 1024 * 1024
+
+
+def pdf_files() -> List[Path]:
+    """Uploaded PDFs, whatever the case of the extension."""
+    return [f for f in DOCUMENTS_DIR.iterdir() if f.suffix.lower() == ".pdf"]
 
 
 def resolve_document_path(filename: str) -> Path:
@@ -113,17 +120,29 @@ async def root():
 async def upload_document(file: UploadFile = File(...)):
     """Upload and process a PDF document"""
     try:
-        if not file.filename or not file.filename.endswith('.pdf'):
+        if not file.filename or not file.filename.lower().endswith(".pdf"):
             raise HTTPException(status_code=400, detail="Only PDF files are allowed")
+
+        file.file.seek(0, os.SEEK_END)
+        if file.file.tell() > MAX_UPLOAD_BYTES:
+            raise HTTPException(status_code=413, detail=f"PDFs are limited to {MAX_UPLOAD_BYTES // 2**20} MB")
+        file.file.seek(0)
 
         # Never write to a client-controlled path.
         resolved = resolve_document_path(file.filename)
         safe_name = resolved.name
-        with open(resolved, "wb") as buffer:
-            shutil.copyfileobj(file.file, buffer)
-
-        documents = document_processor.process_pdf(str(resolved))
-        vectorstore_service.add_documents(documents, safe_name)
+        # Stage under a name the document list ignores, and only move it into
+        # place once it is indexed: a PDF that fails to parse never shows up as
+        # uploaded, and a failed re-upload leaves the previous version intact.
+        partial = resolved.with_name(safe_name + ".part")
+        try:
+            with open(partial, "wb") as buffer:
+                shutil.copyfileobj(file.file, buffer)
+            documents = document_processor.process_pdf(str(partial))
+            vectorstore_service.add_documents(documents, safe_name)
+            os.replace(partial, resolved)
+        finally:
+            partial.unlink(missing_ok=True)
 
         return {
             "message": "Document uploaded and processed successfully",
@@ -132,6 +151,8 @@ async def upload_document(file: UploadFile = File(...)):
             "status": "success"
         }
     
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error processing document: {str(e)}")
 
@@ -186,7 +207,7 @@ async def list_documents():
                 "size": f.stat().st_size,
                 "uploaded_at": datetime.fromtimestamp(f.stat().st_mtime).isoformat()
             }
-            for f in DOCUMENTS_DIR.glob("*.pdf")
+            for f in pdf_files()
         ]
         return {"documents": documents, "count": len(documents)}
     except Exception as e:
@@ -212,7 +233,7 @@ async def delete_document(filename: str):
 async def get_statistics():
     """Get system statistics"""
     return {
-        "statistics": {**stats, "total_documents": len(list(DOCUMENTS_DIR.glob("*.pdf")))},
+        "statistics": {**stats, "total_documents": len(pdf_files())},
         "timestamp": datetime.now().isoformat()
     }
 
