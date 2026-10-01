@@ -138,21 +138,27 @@ async def query_documents(request: QueryRequest):
         stats["total_queries"] += 1
         security_warnings = []
         
-        validation_result = input_validator.validate(request.question)
-        if not validation_result["is_valid"]:
-            security_warnings.extend(validation_result["warnings"])
-            log_security_incident(request.question, validation_result["warnings"], False)
-        
-        # Redact detected PII so it reaches neither the audit log nor the LLM.
+        # Redact PII first, so it reaches neither the audit log nor the LLM.
         safe_question, pii_types = pii_detector.redact(request.question)
         if pii_types:
             security_warnings.append(f"PII detected and redacted: {', '.join(pii_types)}")
             log_security_incident(safe_question, ["PII_DETECTED"], True)
-        
+
+        validation_result = input_validator.validate(safe_question)
+        if not validation_result["is_valid"]:
+            security_warnings.extend(validation_result["warnings"])
+            log_security_incident(safe_question, validation_result["warnings"], False)
+
         if any(w.startswith("INJECTION") for w in security_warnings):
             raise HTTPException(status_code=400, detail="Query blocked due to security concerns")
-        
-        result = rag_agent.query(safe_question, request.conversation_history)
+
+        # Earlier turns reach the LLM too (to condense the follow-up question),
+        # and the client sends them as typed, so they get the same redaction.
+        history = [
+            {**msg, "content": pii_detector.redact(str(msg.get("content", "")))[0]}
+            for msg in request.conversation_history or []
+        ]
+        result = rag_agent.query(safe_question, history)
         filtered_answer = content_filter.filter(result["answer"])
         
         return QueryResponse(
