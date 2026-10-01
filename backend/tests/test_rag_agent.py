@@ -17,3 +17,12 @@ def test_query_structure(rag_agent):
     assert "answer" in result
     assert "sources" in result
     assert isinstance(result["sources"], list)
+
+def test_history_is_per_request(rag_agent):
+    """Each query sees only the history it was sent, never a previous caller's."""
+    seen = []
+    rag_agent.chain = lambda inputs: seen.append(inputs) or {"answer": "a", "source_documents": []}
+    rag_agent.query("q2", [{"role": "user", "content": "q1"}, {"role": "assistant", "content": "a1"}])
+    rag_agent.query("q3")
+    assert [m.content for m in seen[0]["chat_history"]] == ["q1", "a1"]
+    assert seen[1]["chat_history"] == []

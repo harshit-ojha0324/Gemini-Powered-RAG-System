@@ -1,7 +1,7 @@
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain.chains import ConversationalRetrievalChain
-from langchain.memory import ConversationBufferMemory
 from langchain.prompts import PromptTemplate
+from langchain.schema import AIMessage, HumanMessage
 from typing import List, Dict, Optional
 import os
 from dotenv import load_dotenv
@@ -46,17 +46,12 @@ class RAGAgent:
             template=CONDENSE_QUESTION_TEMPLATE,
             input_variables=["chat_history", "question"]
         )
-        
-        self.memory = ConversationBufferMemory(
-            memory_key="chat_history",
-            return_messages=True,
-            output_key="answer"
-        )
-        
+
+        # No memory object: the client sends the history with each request, so
+        # the chain stays stateless and one agent can serve every caller.
         self.chain = ConversationalRetrievalChain.from_llm(
             llm=self.llm,
             retriever=self.retriever,
-            memory=self.memory,
             combine_docs_chain_kwargs={"prompt": self.qa_prompt},
             condense_question_prompt=self.condense_prompt,
             return_source_documents=True,
@@ -66,15 +61,12 @@ class RAGAgent:
     def query(self, question: str, conversation_history: Optional[List[Dict]] = None) -> Dict:
         """Process a query and return answer with sources"""
         try:
-            self.memory.clear()
-            if conversation_history:
-                for msg in conversation_history:
-                    if msg["role"] == "user":
-                        self.memory.chat_memory.add_user_message(msg["content"])
-                    elif msg["role"] == "assistant":
-                        self.memory.chat_memory.add_ai_message(msg["content"])
-            
-            result = self.chain({"question": question})
+            chat_history = [
+                HumanMessage(content=msg["content"]) if msg["role"] == "user" else AIMessage(content=msg["content"])
+                for msg in conversation_history or []
+                if msg["role"] in ("user", "assistant")
+            ]
+            result = self.chain({"question": question, "chat_history": chat_history})
             
             sources = []
             for doc in result.get("source_documents", []):
@@ -103,7 +95,3 @@ class RAGAgent:
                 "sources": [],
                 "question": question
             }
-    
-    def clear_memory(self):
-        """Clear conversation memory"""
-        self.memory.clear()
