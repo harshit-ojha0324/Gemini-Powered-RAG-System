@@ -1,4 +1,5 @@
-FROM python:3.9-slim
+# Same Python as CI, so the image runs what the tests ran on.
+FROM python:3.10-slim
 
 WORKDIR /app
 
