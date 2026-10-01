@@ -129,7 +129,7 @@ function ChatInterface({ documents }) {
               Smart Document Q&A
             </h2>
             <p style={{ fontSize: '14px', marginBottom: '24px', maxWidth: '380px', lineHeight: '1.6' }}>
-              Powered by Gemini 2.0 Flash. Upload a PDF and ask anything about its contents.
+              Powered by Gemini Flash. Upload a PDF and ask anything about its contents.
             </p>
             <div style={{
               display: 'grid',

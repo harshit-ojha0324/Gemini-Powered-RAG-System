@@ -19,7 +19,7 @@ class FallbackEmbeddings:
         # Primary: Gemini embeddings — model can be overridden via GEMINI_MODEL.
         # Construction makes no API call: it only fails when no key is set. A bad
         # model or key shows up on the first embed, which then switches to local.
-        self.primary_model = os.getenv("GEMINI_MODEL") or "models/embedding-001"
+        self.primary_model = os.getenv("GEMINI_MODEL") or "models/gemini-embedding-001"
         try:
             self.primary_embeddings = GoogleGenerativeAIEmbeddings(  # type: ignore[call-arg]
                 model=self.primary_model,

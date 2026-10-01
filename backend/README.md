@@ -6,6 +6,6 @@ Chroma's anonymized telemetry is off by default (`services/vectorstore.py` sets 
 
 ## Gemini / Embeddings
 
-The Gemini embedding model is set by the `GEMINI_MODEL` environment variable (default `models/embedding-001`).
+The Gemini embedding model is set by the `GEMINI_MODEL` environment variable (default `models/gemini-embedding-001`).
 
 If the configured Gemini model is not available or initialization fails, the service automatically falls back to local HuggingFace embeddings.

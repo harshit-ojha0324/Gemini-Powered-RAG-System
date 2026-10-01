@@ -22,10 +22,14 @@ _gcm._create_retry_decorator = _patched_retry_decorator
 from services.vectorstore import VectorStoreService
 from agents.prompt_templates import RAG_PROMPT_TEMPLATE, CONDENSE_QUESTION_TEMPLATE
 
+# Google's alias for its newest Flash model. Fixed IDs get retired (gemini-2.0-flash
+# was shut down on June 1, 2026), which turned every answer into a 404.
+CHAT_MODEL = "gemini-flash-latest"
+
 class RAGAgent:
     def __init__(self, vectorstore_service: Optional[VectorStoreService] = None):
         self.llm = ChatGoogleGenerativeAI(  # type: ignore[call-arg]
-            model="gemini-2.0-flash",
+            model=CHAT_MODEL,
             temperature=0.3,
             google_api_key=os.getenv("GEMINI_API_KEY")
         )

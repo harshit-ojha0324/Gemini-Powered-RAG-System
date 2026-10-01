@@ -31,7 +31,7 @@ The system uses a RAG pipeline:
 1. PDFs are parsed and split into **semantically-coherent chunks** (sentences are embedded and split at topic-shift breakpoints, with a recursive-character fallback)
 2. Chunks are embedded into a vector database (Chroma) using Google Gemini embeddings
 3. At query time, semantically similar chunks are retrieved and passed to the LLM as context
-4. Gemini 2.0 Flash generates a grounded, accurate response
+4. Gemini Flash generates a grounded, accurate response
 
 Conversation history is maintained so you can ask follow-up questions naturally.
 
@@ -114,7 +114,7 @@ Conversation history is maintained so you can ask follow-up questions naturally.
 |---|---|
 | Frontend | React 18, Vite, Axios, Lucide React |
 | Backend | Python 3.9+, FastAPI, Uvicorn |
-| LLM | Google Gemini 2.0 Flash (`langchain-google-genai`) |
+| LLM | Google Gemini Flash, via the `gemini-flash-latest` alias (`langchain-google-genai`) |
 | Embeddings | Gemini Embeddings (HuggingFace fallback) |
 | Vector Store | ChromaDB 0.4 |
 | LLM Orchestration | LangChain 0.1 |
@@ -199,7 +199,7 @@ All configuration is managed via environment variables. Copy `.env.example` to `
 | Variable | Default | Description |
 |---|---|---|
 | `GEMINI_API_KEY` | *(required)* | Your Google Gemini API key |
-| `GEMINI_MODEL` | `models/embedding-001` | Gemini **embedding** model (the generation model is fixed to `gemini-2.0-flash` in `rag_agent.py`, not controlled by this variable) |
+| `GEMINI_MODEL` | `models/gemini-embedding-001` | Gemini **embedding** model (the generation model is `CHAT_MODEL` in `rag_agent.py`, not controlled by this variable) |
 | `CHROMA_PERSIST_DIRECTORY` | `./data/vectorstore` | Path to persist the Chroma vector DB |
 | `ANONYMIZED_TELEMETRY` | `False` | Chroma anonymized telemetry (off unless set to `True`) |
 
