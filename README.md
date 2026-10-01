@@ -112,7 +112,7 @@ Conversation history is maintained so you can ask follow-up questions naturally.
 
 | Layer | Technology |
 |---|---|
-| Frontend | React 18, Vite, Axios, Lucide React |
+| Frontend | React 18, Vite, Lucide React |
 | Backend | Python 3.9+, FastAPI, Uvicorn |
 | LLM | Google Gemini Flash, via the `gemini-flash-latest` alias (`langchain-google-genai`) |
 | Embeddings | Gemini Embeddings (HuggingFace fallback) |
@@ -369,7 +369,7 @@ llm-document-agent/
 │   │   │   ├── MessageBubble.jsx  # Individual chat message rendering
 │   │   │   └── SecurityDashboard.jsx # Security metrics and incident log
 │   │   └── services/
-│   │       └── api.js             # Axios API client (all backend calls)
+│   │       └── api.js             # fetch helper for all backend calls
 │   ├── package.json
 │   └── vite.config.js
 │
