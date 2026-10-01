@@ -50,7 +50,7 @@ Conversation history is maintained so you can ask follow-up questions naturally.
 
 ### Security
 - **PII Detection** — Identifies emails, phone numbers, SSNs, and credit card numbers using Microsoft Presidio (with regex fallback)
-- **Injection Prevention** — Detects and blocks SQL injection, prompt injection, and XSS attacks in user input
+- **Injection Prevention** — Detects and blocks prompt-injection attempts in user input
 - **Output Content Filtering** — Redacts API keys, passwords, and tokens from LLM responses before they reach the user
 - **Security Audit Logging** — All security incidents are logged with timestamps for review
 - **Security Dashboard** — Real-time monitoring UI showing incident counts, PII detections, and recent events
@@ -283,9 +283,7 @@ This application implements a multi-layer security architecture to protect both 
 ### Input Validation
 
 All user queries pass through `InputValidator` before reaching the LLM:
-- **SQL Injection** — Detects `DROP TABLE`, `SELECT *`, `UNION SELECT`, and similar patterns
 - **Prompt Injection** — Detects attempts to override system instructions (e.g., "ignore previous instructions")
-- **XSS** — Detects `<script>`, `javascript:`, and similar vectors
 
 Flagged queries are blocked and logged before any LLM processing occurs.
 
@@ -383,7 +381,7 @@ llm-document-agent/
 │   │   └── embedding_fallback.py  # Gemini/HuggingFace embedding with fallback
 │   ├── security/
 │   │   ├── pii_detector.py        # PII detection (Presidio + regex)
-│   │   ├── input_validator.py     # Injection and XSS detection
+│   │   ├── input_validator.py     # Prompt-injection detection
 │   │   └── content_filter.py      # Output sensitive data redaction
 │   ├── tests/                     # pytest test suite
 │   ├── app.py                     # FastAPI application and route definitions
