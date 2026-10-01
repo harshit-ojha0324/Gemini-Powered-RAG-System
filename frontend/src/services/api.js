@@ -1,37 +1,12 @@
-import axios from 'axios';
+// The browser calls the backend directly (CORS allows :5173), which works the
+// same for local runs and docker-compose, where 8000 is published on the host.
+const BASE_URL = 'http://localhost:8000';
 
-const api = axios.create({
-  baseURL: 'http://localhost:8000',
-  headers: {
-    'Content-Type': 'application/json',
-  },
-});
-
-// Request interceptor
-api.interceptors.request.use(
-  (config) => {
-    return config;
-  },
-  (error) => {
-    return Promise.reject(error);
-  }
-);
-
-// Response interceptor
-api.interceptors.response.use(
-  (response) => {
-    return response;
-  },
-  (error) => {
-    if (error.response) {
-      console.error('API Error:', error.response.data);
-    } else if (error.request) {
-      console.error('Network Error:', error.request);
-    } else {
-      console.error('Error:', error.message);
-    }
-    return Promise.reject(error);
-  }
-);
-
-export default api;
+// fetch() that resolves to the parsed JSON body and rejects on non-2xx, with
+// the backend's FastAPI `detail` message on `error.detail` when there is one.
+export default async function api(path, options) {
+  const res = await fetch(BASE_URL + path, options);
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw Object.assign(new Error(`HTTP ${res.status}`), { detail: data.detail });
+  return data;
+}

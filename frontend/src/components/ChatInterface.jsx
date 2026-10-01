@@ -36,24 +36,25 @@ function ChatInterface({ documents }) {
     setLoading(true);
 
     try {
-      const response = await api.post('/api/query', {
-        question,
-        conversation_history: messages
+      const data = await api('/api/query', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ question, conversation_history: messages })
       });
 
       const assistantMessage = {
         role: 'assistant',
-        content: response.data.answer,
-        sources: response.data.sources,
-        warnings: response.data.security_warnings,
-        metadata: response.data.metadata
+        content: data.answer,
+        sources: data.sources,
+        warnings: data.security_warnings,
+        metadata: data.metadata
       };
 
       setMessages(prev => [...prev, assistantMessage]);
     } catch (error) {
       setMessages(prev => [...prev, {
         role: 'assistant',
-        content: error.response?.data?.detail || 'Sorry, I encountered an error processing your question.',
+        content: error.detail || 'Sorry, I encountered an error processing your question.',
         error: true
       }]);
     } finally {

@@ -40,16 +40,16 @@ function DocumentUpload({ onUploadSuccess, documents, onDeleteSuccess }) {
     formData.append('file', file);
 
     try {
-      const response = await api.post('/api/upload', formData);
+      const data = await api('/api/upload', { method: 'POST', body: formData });
       setUploadStatus({
         type: 'success',
-        message: `"${file.name}" uploaded — ${response.data.chunks} chunks indexed`
+        message: `"${file.name}" uploaded — ${data.chunks} chunks indexed`
       });
       onUploadSuccess();
     } catch (error) {
       setUploadStatus({
         type: 'error',
-        message: error.response?.data?.detail || 'Upload failed. Please try again.'
+        message: error.detail || 'Upload failed. Please try again.'
       });
     } finally {
       setUploading(false);
@@ -60,7 +60,7 @@ function DocumentUpload({ onUploadSuccess, documents, onDeleteSuccess }) {
     if (!window.confirm(`Delete "${filename}"?`)) return;
     setDeletingFile(filename);
     try {
-      await api.delete(`/api/documents/${encodeURIComponent(filename)}`);
+      await api(`/api/documents/${encodeURIComponent(filename)}`, { method: 'DELETE' });
       setUploadStatus({ type: 'success', message: `"${filename}" deleted.` });
       onDeleteSuccess();
     } catch {

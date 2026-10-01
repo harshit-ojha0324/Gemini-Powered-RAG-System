@@ -20,8 +20,8 @@ function App() {
 
   const loadDocuments = async () => {
     try {
-      const response = await api.get('/api/documents');
-      setDocuments(response.data.documents);
+      const data = await api('/api/documents');
+      setDocuments(data.documents);
     } catch (error) {
       console.error('Error loading documents:', error);
     }
@@ -29,8 +29,8 @@ function App() {
 
   const loadStats = async () => {
     try {
-      const response = await api.get('/api/stats');
-      setStats(response.data.statistics);
+      const data = await api('/api/stats');
+      setStats(data.statistics);
     } catch (error) {
       console.error('Error loading stats:', error);
     }

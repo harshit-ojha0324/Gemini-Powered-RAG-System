@@ -15,13 +15,13 @@ function SecurityDashboard() {
 
   const loadData = async () => {
     try {
-      const [logsRes, statsRes] = await Promise.all([
-        api.get('/api/security/logs?limit=20'),
-        api.get('/api/stats')
+      const [logsData, statsData] = await Promise.all([
+        api('/api/security/logs?limit=20'),
+        api('/api/stats')
       ]);
 
-      setLogs(logsRes.data.logs);
-      setStats(statsRes.data.statistics);
+      setLogs(logsData.logs);
+      setStats(statsData.statistics);
       setLoading(false);
     } catch (error) {
       console.error('Error loading security data:', error);
