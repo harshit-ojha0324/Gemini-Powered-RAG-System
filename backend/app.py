@@ -145,12 +145,10 @@ async def query_documents(request: QueryRequest):
             security_warnings.extend(validation_result["warnings"])
             log_security_incident(request.question, validation_result["warnings"], False)
         
-        pii_result = pii_detector.detect(request.question)
-        safe_question = request.question
-        if pii_result["has_pii"]:
-            # Redact detected PII so it reaches neither the audit log nor the LLM.
-            safe_question = pii_detector.redact(request.question)
-            security_warnings.append(f"PII detected and redacted: {', '.join(pii_result['types'])}")
+        # Redact detected PII so it reaches neither the audit log nor the LLM.
+        safe_question, pii_types = pii_detector.redact(request.question)
+        if pii_types:
+            security_warnings.append(f"PII detected and redacted: {', '.join(pii_types)}")
             log_security_incident(safe_question, ["PII_DETECTED"], True)
         
         if any(w.startswith("INJECTION") for w in security_warnings):

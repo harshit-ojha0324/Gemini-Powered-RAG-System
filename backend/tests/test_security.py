@@ -16,36 +16,29 @@ def content_filter():
     return ContentFilter()
 
 class TestPIIDetector:
-    def test_detect_email(self, pii_detector):
-        """Test email detection"""
-        text = "Contact me at john.doe@example.com"
-        result = pii_detector.detect(text)
-        assert result["has_pii"] is True
-        assert any("EMAIL" in t.upper() for t in result["types"])
-    
-    def test_detect_phone(self, pii_detector):
-        """Test phone number detection"""
-        text = "Call me at 555-123-4567"
-        result = pii_detector.detect(text)
-        assert result["has_pii"] is True
-    
-    def test_detect_ssn(self, pii_detector):
-        """Test SSN detection"""
-        text = "My SSN is 123-45-6789"
-        result = pii_detector.detect(text)
-        assert result["has_pii"] is True
-    
+    # Each case runs on whichever path is live: Presidio when the spaCy model
+    # is installed (Docker image), the regex fallback otherwise (CI).
+    @pytest.mark.parametrize("text, secret, pii_type", [
+        ("Contact me at john.doe@example.com", "john.doe@example.com", "EMAIL_ADDRESS"),
+        ("Call me at 212-555-0187", "212-555-0187", "PHONE_NUMBER"),
+        # Not 123-45-6789: Presidio rejects well-known sample SSNs by design.
+        ("My SSN is 536-22-8726", "536-22-8726", "US_SSN"),
+        ("Card 4111 1111 1111 1111 expires soon", "4111 1111 1111 1111", "CREDIT_CARD"),
+    ])
+    def test_redacts_pii(self, pii_detector, text, secret, pii_type):
+        redacted, types = pii_detector.redact(text)
+        assert secret not in redacted
+        assert "[REDACTED]" in redacted
+        assert pii_type in types
+
     def test_no_pii(self, pii_detector):
-        """Test text without PII"""
         text = "This is a normal sentence"
-        result = pii_detector.detect(text)
-        assert result["has_pii"] is False
-    
-    def test_anonymize(self, pii_detector):
-        """Test PII anonymization"""
-        text = "Email me at test@example.com"
-        anonymized = pii_detector.anonymize(text)
-        assert "test@example.com" not in anonymized
+        assert pii_detector.redact(text) == (text, [])
+
+    def test_names_are_not_redacted(self, pii_detector):
+        """Names are what people ask documents about, so they reach the LLM."""
+        text = "What did John Smith say about Q3?"
+        assert pii_detector.redact(text) == (text, [])
 
 class TestInputValidator:
     def test_sql_injection_detection(self, input_validator):
