@@ -181,7 +181,7 @@ function App() {
         {/* Content */}
         <main style={{ flex: 1, overflow: 'auto' }}>
           {activeTab === 'chat' && <ChatInterface documents={documents} />}
-          {activeTab === 'security' && <SecurityDashboard />}
+          {activeTab === 'security' && <SecurityDashboard stats={stats} />}
           {activeTab === 'upload' && (
             <DocumentUpload
               onUploadSuccess={handleDocumentUpload}

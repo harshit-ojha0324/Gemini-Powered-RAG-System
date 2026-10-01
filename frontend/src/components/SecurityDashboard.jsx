@@ -2,9 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { Shield, AlertTriangle, Eye, Clock } from 'lucide-react';
 import api from '../services/api';
 
-function SecurityDashboard() {
+// `stats` comes from App, which already polls /api/stats.
+function SecurityDashboard({ stats }) {
   const [logs, setLogs] = useState([]);
-  const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -15,13 +15,8 @@ function SecurityDashboard() {
 
   const loadData = async () => {
     try {
-      const [logsData, statsData] = await Promise.all([
-        api('/api/security/logs?limit=20'),
-        api('/api/stats')
-      ]);
-
-      setLogs(logsData.logs);
-      setStats(statsData.statistics);
+      const data = await api('/api/security/logs?limit=20');
+      setLogs(data.logs);
       setLoading(false);
     } catch (error) {
       console.error('Error loading security data:', error);
