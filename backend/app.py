@@ -1,6 +1,6 @@
 from fastapi import FastAPI, UploadFile, File, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import List, Optional
 from collections import deque
 import shutil
@@ -65,9 +65,13 @@ def resolve_document_path(filename: str) -> Path:
         raise HTTPException(status_code=400, detail="Invalid filename")
     return candidate
 
+# Bounds on what one request can make us redact, embed and send to the LLM.
+MAX_QUESTION_CHARS = 10_000
+MAX_HISTORY_MESSAGES = 10
+
 # Request/Response Models
 class QueryRequest(BaseModel):
-    question: str
+    question: str = Field(max_length=MAX_QUESTION_CHARS)
     conversation_history: Optional[List[dict]] = []
 
 class QueryResponse(BaseModel):
@@ -155,8 +159,8 @@ async def query_documents(request: QueryRequest):
         # Earlier turns reach the LLM too (to condense the follow-up question),
         # and the client sends them as typed, so they get the same redaction.
         history = [
-            {**msg, "content": pii_detector.redact(str(msg.get("content", "")))[0]}
-            for msg in request.conversation_history or []
+            {**msg, "content": pii_detector.redact(str(msg.get("content", ""))[:MAX_QUESTION_CHARS])[0]}
+            for msg in (request.conversation_history or [])[-MAX_HISTORY_MESSAGES:]
         ]
         result = rag_agent.query(safe_question, history)
         filtered_answer = content_filter.filter(result["answer"])

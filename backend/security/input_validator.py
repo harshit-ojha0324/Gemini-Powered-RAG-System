@@ -24,10 +24,6 @@ class InputValidator:
         warnings = []
         is_valid = True
         
-        if len(text) > 10000:
-            warnings.append("INPUT_TOO_LONG")
-            is_valid = False
-        
         for pattern in self.prompt_injection_patterns:
             if re.search(pattern, text, re.IGNORECASE):
                 warnings.append("INJECTION_PROMPT_DETECTED")

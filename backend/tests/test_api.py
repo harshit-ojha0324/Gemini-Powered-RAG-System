@@ -43,6 +43,10 @@ def test_security_logs():
     assert "logs" in data
     assert "count" in data
 
+def test_overlong_question_is_rejected_before_any_work():
+    response = client.post("/api/query", json={"question": "a" * 10_001})
+    assert response.status_code == 422
+
 def test_security_logs_are_newest_first_and_limited(tmp_path, monkeypatch):
     import json
     import app as app_module

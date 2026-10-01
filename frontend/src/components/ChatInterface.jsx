@@ -212,6 +212,7 @@ function ChatInterface({ documents }) {
         <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
           <input
             type="text"
+            maxLength={10000}
             value={input}
             onChange={(e) => setInput(e.target.value)}
             placeholder={hasDocuments ? 'Ask a question about your documents…' : 'Upload a document to start asking questions'}

@@ -57,13 +57,6 @@ class TestInputValidator:
     ])
     def test_valid_input(self, input_validator, valid):
         assert input_validator.validate(valid)["is_valid"] is True
-    
-    def test_input_too_long(self, input_validator):
-        """Test input length validation"""
-        long_text = "a" * 10001
-        result = input_validator.validate(long_text)
-        assert result["is_valid"] is False
-        assert "INPUT_TOO_LONG" in result["warnings"]
 
 class TestContentFilter:
     def test_filter_api_key(self, content_filter):

@@ -109,6 +109,18 @@ def test_pii_reaches_neither_the_log_nor_the_llm(tmp_path, monkeypatch):
     assert email not in str(seen[0]["chat_history"])
 
 
+def test_history_sent_to_the_llm_is_bounded(monkeypatch):
+    seen = []
+    monkeypatch.setattr(app_module.rag_agent, "chain",
+                        lambda inputs: seen.append(inputs) or {"answer": "ok", "source_documents": []})
+    history = [{"role": "user", "content": f"q{i} " + "x" * 20_000} for i in range(15)]
+    client.post("/api/query", json={"question": "next?", "conversation_history": history})
+
+    sent = seen[0]["chat_history"]
+    assert len(sent) == 10 and sent[0].content.startswith("q5")
+    assert all(len(m.content) <= 10_000 for m in sent)
+
+
 # --- embeddings fail loudly -------------------------------------------------
 
 def _fallback_with_broken_local_model(monkeypatch):
