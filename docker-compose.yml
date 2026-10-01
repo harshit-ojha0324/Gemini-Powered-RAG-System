@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   backend:
     build:
@@ -15,8 +13,6 @@ services:
       - ./data:/app/data
       - ./backend:/app
     command: uvicorn app:app --host 0.0.0.0 --port 8000 --reload
-    networks:
-      - app-network
 
   frontend:
     build:
@@ -30,9 +26,3 @@ services:
     command: npm run dev -- --host
     depends_on:
       - backend
-    networks:
-      - app-network
-
-networks:
-  app-network:
-    driver: bridge
