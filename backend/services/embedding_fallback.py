@@ -77,10 +77,38 @@ class FallbackEmbeddings:
                 logger.info("✅ Fallback embeddings loaded successfully")
             except Exception as e:
                 logger.error(f"❌ Failed to load fallback embeddings: {e}")
-                # Last resort: return dummy embeddings
-                logger.warning("⚠️ Using dummy embeddings as last resort")
-                self.fallback_embeddings = DummyEmbeddings()
+                # DummyEmbeddings produces dimensionally-valid vectors with no
+                # semantic signal, so an index built on it fails *silently* —
+                # retrieval returns confident nonsense instead of an error.
+                # Refuse by default; it is opt-in for offline tests only.
+                if os.getenv("ALLOW_DUMMY_EMBEDDINGS", "").lower() in {"1", "true", "yes"}:
+                    logger.warning(
+                        "⚠️ ALLOW_DUMMY_EMBEDDINGS is set — using signal-free dummy "
+                        "embeddings. Retrieval results are meaningless."
+                    )
+                    self.fallback_embeddings = DummyEmbeddings()
+                else:
+                    raise RuntimeError(
+                        "No usable embedding model: Gemini is unavailable and the local "
+                        "HuggingFace fallback failed to load. Refusing to build an index "
+                        "with signal-free dummy vectors. Set ALLOW_DUMMY_EMBEDDINGS=true "
+                        "to override for offline testing."
+                    ) from e
     
+    @property
+    def mode(self) -> str:
+        """Which embedding backend is live: 'gemini', 'local', or 'dummy'."""
+        if not self.use_fallback and self.primary_embeddings is not None:
+            return "gemini"
+        if isinstance(self.fallback_embeddings, DummyEmbeddings):
+            return "dummy"
+        return "local"
+
+    @property
+    def is_degraded(self) -> bool:
+        """True when answers are not backed by the primary embedding model."""
+        return self.mode != "gemini"
+
     def embed_documents(self, texts: List[str]) -> List[List[float]]:
         """Embed a list of documents"""
         if not self.use_fallback and self.primary_embeddings is not None:
@@ -101,7 +129,7 @@ class FallbackEmbeddings:
         self._load_fallback()
         if self.fallback_embeddings is not None:
             return self.fallback_embeddings.embed_documents(texts)
-        return [[0.0] * 384 for _ in texts]  # Fallback if nothing is available
+        raise RuntimeError("No embedding backend available")
 
     def reset_to_primary(self):
         """Reset to attempt Gemini embeddings again (call after quota recovery)"""
@@ -127,7 +155,7 @@ class FallbackEmbeddings:
         self._load_fallback()
         if self.fallback_embeddings is not None:
             return self.fallback_embeddings.embed_query(text)
-        return [0.0] * 384  # Fallback if nothing is available
+        raise RuntimeError("No embedding backend available")
 
 
 class DummyEmbeddings:

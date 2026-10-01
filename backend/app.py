@@ -27,18 +27,39 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Initialize services
-rag_agent = RAGAgent()
+# Initialize services.
+# One VectorStoreService for the whole process: the agent must query the same
+# instance the upload path writes to, or /api/reset-embeddings resets a store
+# nobody reads while queries keep serving vectors from a second, stale one.
+vectorstore_service = VectorStoreService()
+rag_agent = RAGAgent(vectorstore_service=vectorstore_service)
 pii_detector = PIIDetector()
 input_validator = InputValidator()
 content_filter = ContentFilter()
-vectorstore_service = VectorStoreService()
 # Share the vector store's embeddings so semantic chunking and indexing use one model.
 document_processor = DocumentProcessor(embeddings=vectorstore_service.embeddings)
 
 # Ensure directories exist
-Path("./data/documents").mkdir(parents=True, exist_ok=True)
+DOCUMENTS_DIR = Path("./data/documents").resolve()
+DOCUMENTS_DIR.mkdir(parents=True, exist_ok=True)
 Path("./data/logs").mkdir(parents=True, exist_ok=True)
+
+
+def resolve_document_path(filename: str) -> Path:
+    """Map a client-supplied filename to a path inside DOCUMENTS_DIR.
+
+    The client string is never used as a path. We take its basename and then
+    assert the resolved result is still contained in the documents directory,
+    so '../', absolute paths and symlink tricks cannot escape.
+    """
+    basename = Path(filename or "").name
+    if not basename or basename in {".", ".."}:
+        raise HTTPException(status_code=400, detail="Invalid filename")
+
+    candidate = (DOCUMENTS_DIR / basename).resolve()
+    if candidate.parent != DOCUMENTS_DIR:
+        raise HTTPException(status_code=400, detail="Invalid filename")
+    return candidate
 
 # Request/Response Models
 class QueryRequest(BaseModel):
@@ -90,19 +111,21 @@ async def upload_document(file: UploadFile = File(...)):
     try:
         if not file.filename or not file.filename.endswith('.pdf'):
             raise HTTPException(status_code=400, detail="Only PDF files are allowed")
-        
-        file_path = f"./data/documents/{file.filename}"
-        with open(file_path, "wb") as buffer:
+
+        # Never write to a client-controlled path.
+        resolved = resolve_document_path(file.filename)
+        safe_name = resolved.name
+        with open(resolved, "wb") as buffer:
             shutil.copyfileobj(file.file, buffer)
-        
-        documents = document_processor.process_pdf(file_path)
-        vectorstore_service.add_documents(documents, file.filename)
+
+        documents = document_processor.process_pdf(str(resolved))
+        vectorstore_service.add_documents(documents, safe_name)
         
         stats["total_documents"] += 1
         
         return {
             "message": "Document uploaded and processed successfully",
-            "filename": file.filename,
+            "filename": safe_name,
             "chunks": len(documents),
             "status": "success"
         }
@@ -173,10 +196,10 @@ async def list_documents():
 async def delete_document(filename: str):
     """Delete a document"""
     try:
-        file_path = Path(f"./data/documents/{filename}")
+        file_path = resolve_document_path(filename)
         if file_path.exists():
             file_path.unlink()
-            vectorstore_service.delete_document(filename)
+            vectorstore_service.delete_document(file_path.name)
             stats["total_documents"] -= 1
             return {"message": "Document deleted successfully"}
         else:
@@ -218,12 +241,17 @@ async def get_security_logs(limit: int = 50):
 @app.get("/api/health")
 async def health_check():
     """Health check endpoint"""
+    embeddings = vectorstore_service.embeddings
+    degraded = embeddings.is_degraded
     return {
-        "status": "healthy",
+        "status": "degraded" if degraded else "healthy",
         "timestamp": datetime.now().isoformat(),
         "services": {
             "rag_agent": "operational",
-            "vector_store": "operational",
+            # A live embedding fallback silently changes what retrieval returns,
+            # so it has to be visible rather than only in the server logs.
+            "vector_store": "degraded" if degraded else "operational",
+            "embedding_mode": embeddings.mode,
             "security": "operational"
         }
     }

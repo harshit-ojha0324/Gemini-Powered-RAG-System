@@ -26,13 +26,15 @@ from agents.prompt_templates import RAG_PROMPT_TEMPLATE, CONDENSE_QUESTION_TEMPL
 load_dotenv()
 
 class RAGAgent:
-    def __init__(self):
+    def __init__(self, vectorstore_service: Optional[VectorStoreService] = None):
         self.llm = ChatGoogleGenerativeAI(  # type: ignore[call-arg]
             model="gemini-2.0-flash",
             temperature=0.3,
             google_api_key=os.getenv("GEMINI_API_KEY")
         )
-        self.vectorstore_service = VectorStoreService()
+        # Injected by the app so the agent reads the same store the upload path
+        # writes to. Constructing one here is a fallback for standalone use.
+        self.vectorstore_service = vectorstore_service or VectorStoreService()
         self.retriever = self.vectorstore_service.get_retriever()
         
         self.qa_prompt = PromptTemplate(
