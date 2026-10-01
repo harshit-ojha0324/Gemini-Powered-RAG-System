@@ -59,7 +59,7 @@ Conversation history is maintained so you can ask follow-up questions naturally.
 - **Auto-generated API Docs** — Swagger UI at `/docs` and ReDoc at `/redoc`
 - **Docker Support** — One-command deployment with Docker Compose
 - **Makefile Shortcuts** — Common tasks available as `make` commands
-- **Test Suite** — Pytest with coverage reporting (note: three of the six backend test modules are still empty placeholder stubs)
+- **Test Suite** — Pytest suite run in CI on every push
 
 ---
 
@@ -143,26 +143,22 @@ git clone <repository-url>
 cd llm-document-agent
 ```
 
-**2. Run the setup script**
+**2. Install**
 
-This creates a Python virtual environment, installs all backend and frontend dependencies, and downloads the required spaCy NLP model.
+This creates a Python virtual environment, installs all backend and frontend dependencies, downloads the required spaCy NLP model, and copies `.env.example` to `backend/.env`.
 
 ```bash
-bash setup.sh
+make setup
 ```
 
 **3. Configure your API key**
 
-```bash
-cp .env.example backend/.env
-# Open backend/.env and set your key:
-# GEMINI_API_KEY=your_key_here
-```
+Open `backend/.env` and set `GEMINI_API_KEY=your_key_here`.
 
 **4. Start the application**
 
 ```bash
-bash start.sh
+make start   # Ctrl+C stops both servers
 ```
 
 The application will be available at:
@@ -176,37 +172,21 @@ The application will be available at:
 
 ### Docker Deployment
 
-**1. Configure environment**
-
 ```bash
-cp .env.example .env
-# Set GEMINI_API_KEY in .env
-```
-
-**2. Start with Docker Compose**
-
-```bash
-bash start-docker.sh
-# or
-make docker-start
-```
-
-**3. Stop containers**
-
-```bash
+make docker-start   # first run creates .env from .env.example; set GEMINI_API_KEY there and rerun
 make docker-stop
 ```
 
 ### Makefile Commands
 
 ```bash
-make setup        # Run initial setup
-make start        # Start locally
-make stop         # Stop local services
-make test         # Run test suite with coverage
-make clean        # Remove venvs and caches
-make install      # Install dependencies only
-make docker-start # Start with Docker
+make setup        # Create the venv, install dependencies, create backend/.env
+make start        # Start backend and frontend locally
+make stop         # Stop local servers listening on 8000 / 5173
+make test         # Run the backend test suite
+make eval         # Run the retrieval & grounding eval
+make clean        # Remove venvs, caches and local data
+make docker-start # Start with Docker Compose
 make docker-stop  # Stop Docker containers
 ```
 
@@ -340,23 +320,12 @@ All security incidents are written to `data/logs/security_events.jsonl` with the
 
 ## Testing
 
-Run the full test suite with coverage:
-
 ```bash
-bash run-tests.sh
-# or
 make test
+# or: cd backend && venv/bin/python -m pytest
 ```
 
-This runs all tests under `backend/tests/` and generates an HTML coverage report at `backend/htmlcov/index.html`.
-
-To run tests directly with pytest:
-
-```bash
-cd backend
-source venv/bin/activate
-pytest tests/ -v --cov=. --cov-report=html
-```
+This runs all tests under `backend/tests/`, the same command CI runs.
 
 ### Retrieval & Grounding Evaluation
 
@@ -411,10 +380,6 @@ llm-document-agent/
 │
 ├── docker-compose.yml
 ├── Makefile
-├── setup.sh
-├── start.sh
-├── start-docker.sh
-├── run-tests.sh
 └── .env.example
 ```
 
