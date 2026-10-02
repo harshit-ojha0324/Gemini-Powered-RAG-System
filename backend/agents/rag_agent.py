@@ -6,16 +6,18 @@ from typing import List, Dict, Optional
 import logging
 import os
 from google.api_core.exceptions import ResourceExhausted
-from tenacity import retry, stop_after_attempt, retry_if_exception_type
+from tenacity import retry, stop_after_attempt, retry_if_exception_type, wait_exponential
 import google.api_core.exceptions as _gexc
 import langchain_google_genai.chat_models as _gcm
 
 # Patch langchain-google-genai 0.0.6 which hardcodes 10 retries on ResourceExhausted.
-# We only retry transient ServiceUnavailable errors, not quota errors.
+# We only retry transient ServiceUnavailable errors (two retries, short backoff),
+# not quota errors.
 def _patched_retry_decorator():
     return retry(
         reraise=True,
-        stop=stop_after_attempt(1),
+        stop=stop_after_attempt(3),
+        wait=wait_exponential(max=4),
         retry=retry_if_exception_type(_gexc.ServiceUnavailable),
     )
 _gcm._create_retry_decorator = _patched_retry_decorator
