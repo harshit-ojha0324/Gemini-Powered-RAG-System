@@ -16,7 +16,7 @@ def test_semantic_chunker_splits_at_the_topic_shift():
     assert chunks == [" ".join([APPLE] * 4), " ".join([ROCKET] * 4)]
 
 
-def test_semantic_chunker_falls_back_when_embedding_fails():
+def test_semantic_chunker_falls_back_when_embedding_fails(caplog):
     class Broken:
         def embed_documents(self, texts):
             raise RuntimeError("no embeddings")
@@ -24,3 +24,4 @@ def test_semantic_chunker_falls_back_when_embedding_fails():
     text = " ".join([APPLE] * 4 + [ROCKET] * 4)
     chunks = SemanticChunker(Broken()).split_text(text)
     assert chunks and all(len(c) <= 1000 for c in chunks)
+    assert "no embeddings" in caplog.text

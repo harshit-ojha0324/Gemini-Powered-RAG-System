@@ -1,3 +1,4 @@
+import logging
 import os
 import re
 import math
@@ -7,6 +8,8 @@ from typing import List, Any
 from pypdf import PdfReader
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain.schema import Document
+
+logger = logging.getLogger(__name__)
 
 # Split on sentence-ending punctuation followed by whitespace and a capital/quote/digit.
 _SENTENCE_BOUNDARY = re.compile(r'(?<=[.!?])\s+(?=[A-Z0-9"\'])')
@@ -67,7 +70,10 @@ class SemanticChunker:
 
         try:
             vectors = self.embeddings.embed_documents(sentences)
-        except Exception:
+        except Exception as e:
+            # Say so: otherwise a quota or key problem quietly turns semantic
+            # chunking into fixed-size splitting.
+            logger.warning(f"Sentence embedding failed ({e}); using character splitting for this page")
             return self._fallback(text)
 
         distances = [1.0 - cosine(vectors[i], vectors[i + 1]) for i in range(len(vectors) - 1)]
