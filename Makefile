@@ -10,7 +10,7 @@ setup:
 start:
 	@[ -f backend/.env ] || { echo "backend/.env not found. Run 'make setup' first."; exit 1; }
 	@trap 'kill 0' INT TERM; \
-	(cd backend && venv/bin/uvicorn app:app --host 0.0.0.0 --port 8000 --reload) & \
+	(cd backend && venv/bin/uvicorn app:app --host 127.0.0.1 --port 8000 --reload) & \
 	(cd frontend && npm run dev) & \
 	wait
 
