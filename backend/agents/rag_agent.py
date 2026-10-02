@@ -3,6 +3,7 @@ from langchain.chains import ConversationalRetrievalChain
 from langchain.prompts import PromptTemplate
 from langchain.schema import AIMessage, HumanMessage
 from typing import List, Dict, Optional
+import logging
 import os
 from google.api_core.exceptions import ResourceExhausted
 from tenacity import retry, stop_after_attempt, retry_if_exception_type
@@ -21,6 +22,8 @@ _gcm._create_retry_decorator = _patched_retry_decorator
 
 from services.vectorstore import VectorStoreService
 from agents.prompt_templates import RAG_PROMPT_TEMPLATE, CONDENSE_QUESTION_TEMPLATE
+
+logger = logging.getLogger(__name__)
 
 # Google's alias for its newest Flash model. Fixed IDs get retired (gemini-2.0-flash
 # was shut down on June 1, 2026), which turned every answer into a 404.
@@ -82,12 +85,16 @@ class RAGAgent:
                 "sources": sources
             }
         
-        except ResourceExhausted:
+        except ResourceExhausted as e:
+            # Google's message names the quota that ran out (per minute or per day).
+            logger.warning(f"Gemini quota exhausted: {e}")
             return {
-                "answer": "Gemini API quota exceeded. The free tier daily limit has been reached. Please wait until midnight (Pacific Time) for the quota to reset, or use a new API key.",
+                "answer": "Gemini's rate limit was hit. Wait a minute and try again; if it keeps happening, the free tier's daily quota is used up and resets at midnight Pacific time.",
                 "sources": []
             }
         except Exception as e:
+            # The client only sees the message; the traceback belongs in the server log.
+            logger.exception("Query failed")
             return {
                 "answer": f"I apologize, but I encountered an error: {str(e)}",
                 "sources": []

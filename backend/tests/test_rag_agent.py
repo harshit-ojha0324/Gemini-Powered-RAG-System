@@ -26,3 +26,9 @@ def test_history_is_per_request(rag_agent):
     rag_agent.query("q3")
     assert [m.content for m in seen[0]["chat_history"]] == ["q1", "a1"]
     assert seen[1]["chat_history"] == []
+def test_failures_reach_the_server_log(rag_agent, caplog):
+    def broken_chain(inputs):
+        raise RuntimeError("upstream down")
+    rag_agent.chain = broken_chain
+    assert "upstream down" in rag_agent.query("q")["answer"]
+    assert "Query failed" in caplog.text
