@@ -27,7 +27,7 @@ eval:
 clean:
 	rm -rf backend/venv frontend/node_modules frontend/dist
 	find backend -name __pycache__ -type d -prune -exec rm -rf {} +
-	rm -rf data/documents/* data/vectorstore/* data/logs/*
+	rm -rf backend/data
 
 docker-start:
 	@[ -f .env ] || { cp .env.example .env; echo "Set GEMINI_API_KEY in .env, then rerun."; exit 1; }

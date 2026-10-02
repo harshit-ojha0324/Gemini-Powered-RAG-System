@@ -200,10 +200,10 @@ All configuration is managed via environment variables. Copy `.env.example` to `
 |---|---|---|
 | `GEMINI_API_KEY` | *(required)* | Your Google Gemini API key |
 | `EMBEDDING_MODEL` | Gemini `models/gemini-embedding-001` if `GEMINI_API_KEY` is set, otherwise `local` | `local` for the offline sentence-transformers model, or a Gemini embedding model name. Read once at startup (the answer-generating model is `CHAT_MODEL` in `rag_agent.py`) |
-| `CHROMA_PERSIST_DIRECTORY` | `./data/vectorstore` | Path to persist the Chroma vector DB |
+| `CHROMA_PERSIST_DIRECTORY` | `./data/vectorstore` | Path to persist the Chroma vector DB (relative to `backend/`) |
 | `ANONYMIZED_TELEMETRY` | `False` | Chroma anonymized telemetry (off unless set to `True`) |
 
-**Choosing the embedding model.** The embedding model is fixed for the life of the process, because vectors from different models can't share an index (Gemini's are 3072-dimensional, the local model's 384). Each model gets its own Chroma collection (`documents-<model>`), and at startup the app reconciles that collection with the PDFs in `data/documents`: files it hasn't indexed yet are embedded, and chunks of files deleted since are dropped. Switching models is therefore just a restart; the first start on a model embeds your existing library once. `GET /api/health` reports which model is active.
+**Choosing the embedding model.** The embedding model is fixed for the life of the process, because vectors from different models can't share an index (Gemini's are 3072-dimensional, the local model's 384). Each model gets its own Chroma collection (`documents-<model>`), and at startup the app reconciles that collection with the PDFs in `backend/data/documents`: files it hasn't indexed yet are embedded, and chunks of files deleted since are dropped. Switching models is therefore just a restart; the first start on a model embeds your existing library once. `GET /api/health` reports which model is active.
 
 ---
 
@@ -306,14 +306,14 @@ The frontend Security Dashboard provides:
 
 ### Security Logging
 
-All security incidents are written to `data/logs/security_events.jsonl` with the following structure:
+All security incidents are appended to `backend/data/logs/security_log.jsonl`, one JSON object per line, with the query already redacted:
 
 ```json
 {
-  "timestamp": "2024-01-15T10:30:00Z",
-  "event_type": "pii_detected",
-  "severity": "medium",
-  "details": { "pii_types": ["EMAIL"] }
+  "timestamp": "2026-01-15T10:30:00",
+  "query": "Who is [REDACTED]?",
+  "flags": ["PII_DETECTED"],
+  "pii_detected": true
 }
 ```
 
@@ -358,6 +358,10 @@ llm-document-agent/
 │   │   ├── input_validator.py     # Prompt-injection detection
 │   │   └── content_filter.py      # Output sensitive data redaction
 │   ├── tests/                     # pytest test suite
+│   ├── data/                      # Created at runtime, gitignored; Docker mounts the same folder
+│   │   ├── documents/             # Uploaded PDFs
+│   │   ├── vectorstore/           # Chroma vector database, one collection per embedding model
+│   │   └── logs/                  # Security event log
 │   ├── app.py                     # FastAPI application and route definitions
 │   └── requirements.txt
 │
@@ -373,11 +377,6 @@ llm-document-agent/
 │   │       └── api.js             # fetch helper for all backend calls
 │   ├── package.json
 │   └── vite.config.js
-│
-├── data/
-│   ├── documents/                 # Uploaded PDFs (persisted)
-│   ├── vectorstore/               # Chroma vector database, one collection per embedding model
-│   └── logs/                     # Security event logs (persisted)
 │
 ├── docker-compose.yml
 ├── Makefile

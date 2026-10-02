@@ -19,15 +19,7 @@ ENV/
 .venv/
 backend/venv/
 
-# ── Data directories (user uploads & generated data) ─────────────────
-data/documents/*
-data/vectorstore/*
-data/logs/*
-!data/documents/.gitkeep
-!data/vectorstore/.gitkeep
-!data/logs/.gitkeep
-
-# backend/data mirrors the top-level data/ at runtime
+# ── User uploads & generated data (local runs and Docker alike) ──────
 backend/data/
 
 # ── Node / Frontend ───────────────────────────────────────────────────
