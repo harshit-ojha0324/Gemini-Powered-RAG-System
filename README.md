@@ -268,7 +268,7 @@ This application implements a multi-layer security architecture to protect both 
 ### Input Validation
 
 All user queries pass through `InputValidator` before reaching the LLM:
-- **Prompt Injection** — Detects attempts to override system instructions (e.g., "ignore previous instructions")
+- **Prompt Injection** — Detects attempts to override system instructions (e.g., "ignore previous instructions"), in the question and in the earlier user turns the client sends back as history (flagged turns are dropped from the history)
 
 Flagged queries are blocked and logged before any LLM processing occurs.
 
@@ -278,7 +278,7 @@ The RAG prompt enforces an explicit instruction hierarchy: the system rules sit 
 
 ### PII Redaction
 
-Detected PII is redacted (`security/pii_detector.py`) before the query is written to the audit log or forwarded to Gemini, so raw PII never leaves the process. (Injection attempts are logged verbatim on purpose, for forensics.)
+Detected PII is redacted (`security/pii_detector.py`) before the query is written to the audit log or forwarded to Gemini, so raw PII never leaves the process. That includes blocked injection attempts, which are logged redacted.
 
 ### PII Detection
 

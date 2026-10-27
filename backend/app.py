@@ -216,6 +216,11 @@ def query_documents(request: QueryRequest):
             {**msg, "content": pii_detector.redact(str(msg.get("content", ""))[:MAX_QUESTION_CHARS])[0]}
             for msg in (request.conversation_history or [])[-MAX_HISTORY_MESSAGES:]
         ]
+        # The client also sends back questions that were blocked, so earlier
+        # user turns get the same screen; failing ones are dropped (not a 400,
+        # or one blocked question would block the rest of the conversation).
+        history = [m for m in history
+                   if m.get("role") != "user" or input_validator.validate(m["content"])["is_valid"]]
         result = rag_agent.query(safe_question, history)
         filtered_answer = content_filter.filter(result["answer"])
         
