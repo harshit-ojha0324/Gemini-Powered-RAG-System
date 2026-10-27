@@ -219,6 +219,16 @@ def test_embedding_model_is_chosen_once_from_config(monkeypatch):
     assert load_embeddings() == ("local-model", LOCAL_MODEL)  # explicit choice wins
 
 
+def test_gemini_embeds_questions_as_queries(monkeypatch):
+    import google.generativeai as genai
+    from services.embeddings import GeminiEmbeddings
+    calls = []
+    monkeypatch.setattr(genai, "embed_content", lambda **kw: calls.append(kw) or {"embedding": [0.5]})
+
+    GeminiEmbeddings(model="models/gemini-embedding-001", google_api_key="test-key").embed_query("q")
+    assert calls[0]["task_type"] == "retrieval_query"
+
+
 def test_each_embedding_model_gets_its_own_index(tmp_path, monkeypatch):
     """One shared collection raised InvalidDimensionException on every query
     once a 384-d model met an index built with 768-d (or 3072-d) vectors."""
