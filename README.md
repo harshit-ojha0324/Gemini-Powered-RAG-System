@@ -330,14 +330,16 @@ This runs all tests under `backend/tests/`, the same command CI runs.
 
 ### Retrieval & Grounding Evaluation
 
-Beyond unit tests, a retrieval-evaluation harness (`backend/eval/`) measures the RAG pipeline against a labelled gold set:
+Beyond unit tests, an evaluation harness (`backend/eval/`) scores the embedding model and the RAG prompt against a labelled gold set:
 
 ```bash
 make eval
 # or: cd backend && python -m eval.run_eval --k 4 --threshold 0.7
 ```
 
-It reports **context relevance** (does retrieval surface the passage that holds the answer?) and **grounded-response rate** (are answerable questions answered from context, and are out-of-scope questions correctly abstained on?). It embeds with the app's configured model, so with no `GEMINI_API_KEY` (or with `EMBEDDING_MODEL=local`) it runs fully offline, and it gates on a threshold so it can run in CI. Add `--generate` with a valid `GEMINI_API_KEY` to score answer faithfulness on the model's real responses.
+It reports **context relevance** (does retrieval surface the passage that holds the answer?) and **grounded-response rate** (are answerable questions answered from context, and are out-of-scope questions correctly abstained on?). It embeds with the app's configured model, so with no `GEMINI_API_KEY` (or with `EMBEDDING_MODEL=local`) it runs fully offline, and it exits non-zero below a threshold. Add `--generate` with a valid `GEMINI_API_KEY` to score answer faithfulness on the model's real responses.
+
+Scope, so the numbers aren't over-read: the corpus is ten pre-split, single-topic passages from a fictional handbook, retrieved by a small in-memory cosine search. It does not exercise PDF parsing, the semantic chunker, Chroma, or the conversational chain. Without `--generate`, out-of-scope questions count as handled when the best match scores below `--abstain-threshold`; the app itself has no such cutoff and leaves abstaining to the prompt.
 
 ---
 

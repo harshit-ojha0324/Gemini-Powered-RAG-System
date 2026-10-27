@@ -1,7 +1,7 @@
 """
-Retrieval & grounding evaluation for the RAG system.
+Retrieval & grounding evaluation for the RAG system's embedding model and prompt.
 
-Measures the two properties the project claims:
+Measures:
   * context relevance      — does retrieval surface the passage that actually
                              holds the answer?  (hit-rate @k over a gold labelling)
   * grounded-response rate — for answerable questions, is the answer supported by
@@ -18,6 +18,10 @@ relevant (so the model will abstain).
 Pass --generate with a valid GEMINI_API_KEY to instead score faithfulness on the
 model's actual answers (does it state the fact, stay close to the context, and
 abstain when it should).
+
+Not covered: PDF parsing, the semantic chunker, Chroma and the conversational
+chain. The corpus is pre-split passages searched in memory, and the app has no
+retrieval-score cutoff like the out-of-scope proxy above.
 
 Usage:
     python -m eval.run_eval [--k 4] [--threshold 0.7] [--abstain-threshold 0.35] [--generate]
