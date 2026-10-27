@@ -16,7 +16,9 @@ _SENTENCE_BOUNDARY = re.compile(r'(?<=[.!?])\s+(?=[A-Z0-9"\'])')
 
 BREAKPOINT_PERCENTILE = 90  # a gap in the top 10% of sentence distances is a topic shift
 MIN_CHUNK_CHARS = 250
-MAX_CHUNK_CHARS = 1500
+# all-MiniLM-L6-v2 reads only the first 256 tokens (~1,000 characters of English)
+# of a text, so longer chunks would have their ends left out of the index.
+MAX_CHUNK_CHARS = 1000
 MAX_SENTENCES = 400  # beyond this, one embedding per sentence isn't worth it
 
 
@@ -44,7 +46,7 @@ class SemanticChunker:
 
     def __init__(self, embeddings: Any):
         self.embeddings = embeddings
-        self.fallback_splitter = RecursiveCharacterTextSplitter(chunk_size=1000)
+        self.fallback_splitter = RecursiveCharacterTextSplitter(chunk_size=MAX_CHUNK_CHARS)
 
     # -- public API mirrors LangChain splitters so it's a drop-in replacement --
     def split_documents(self, documents: List[Document]) -> List[Document]:
