@@ -31,7 +31,7 @@ The system uses a RAG pipeline:
 1. PDFs are parsed and split into **semantically-coherent chunks** (sentences are embedded and split at topic-shift breakpoints, with a recursive-character fallback)
 2. Chunks are embedded into a vector database (Chroma) using Google Gemini embeddings, or an offline sentence-transformers model (chosen once at startup)
 3. At query time, semantically similar chunks are retrieved and passed to the LLM as context
-4. Gemini Flash generates a grounded, accurate response
+4. Gemini Flash-Lite generates a grounded, accurate response
 
 Conversation history is maintained so you can ask follow-up questions naturally.
 
@@ -114,7 +114,7 @@ Conversation history is maintained so you can ask follow-up questions naturally.
 |---|---|
 | Frontend | React 18, Vite, Lucide React |
 | Backend | Python 3.9+, FastAPI, Uvicorn |
-| LLM | Google Gemini Flash, via the `gemini-flash-latest` alias (`langchain-google-genai`) |
+| LLM | Google Gemini Flash-Lite, via the `gemini-flash-lite-latest` alias (`langchain-google-genai`) |
 | Embeddings | Gemini `gemini-embedding-001`, or local `all-MiniLM-L6-v2` (sentence-transformers) |
 | Vector Store | ChromaDB 0.4 |
 | LLM Orchestration | LangChain 0.1 |

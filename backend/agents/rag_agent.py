@@ -27,9 +27,12 @@ from agents.prompt_templates import RAG_PROMPT_TEMPLATE, CONDENSE_QUESTION_TEMPL
 
 logger = logging.getLogger(__name__)
 
-# Google's alias for its newest Flash model. Fixed IDs get retired (gemini-2.0-flash
-# was shut down on June 1, 2026), which turned every answer into a 404.
-CHAT_MODEL = "gemini-flash-latest"
+# Google's alias for its newest Flash-Lite model. Fixed IDs get retired (gemini-2.0-flash
+# was shut down on June 1, 2026, which turned every answer into a 404), and the
+# full Flash alias sits on the newest, busiest model: in Oct 2026 it answered
+# free-tier keys with 503s, 429s and 60s gRPC deadlines while Flash-Lite replied
+# in 1-2s. Answering from retrieved context doesn't need the larger model.
+CHAT_MODEL = "gemini-flash-lite-latest"
 
 class RAGAgent:
     def __init__(self, vectorstore_service: Optional[VectorStoreService] = None):
