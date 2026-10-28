@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { User, Bot, AlertTriangle, ChevronDown, ChevronUp, FileText } from 'lucide-react';
 
 function MessageBubble({ message }) {

@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { Send, Loader, FileText, MessageSquare, Zap } from 'lucide-react';
 import MessageBubble from './MessageBubble';
 import api from '../services/api';
