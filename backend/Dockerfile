@@ -20,9 +20,6 @@ RUN python -m spacy download en_core_web_lg
 # Copy application code
 COPY . .
 
-# Create data directories
-RUN mkdir -p /app/data/documents /app/data/vectorstore /app/data/logs
-
 # Expose port
 EXPOSE 8000
 
