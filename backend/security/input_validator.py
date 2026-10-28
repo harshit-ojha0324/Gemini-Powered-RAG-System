@@ -30,10 +30,6 @@ class InputValidator:
                 is_valid = False
                 break
 
-        special_char_ratio = sum(not c.isalnum() and not c.isspace() for c in text) / max(len(text), 1)
-        if special_char_ratio > 0.3:
-            warnings.append("SUSPICIOUS_CHARACTERS")
-        
         return {
             "is_valid": is_valid,
             "warnings": warnings

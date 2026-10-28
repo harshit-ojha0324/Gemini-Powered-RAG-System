@@ -45,26 +45,15 @@ class RAGAgent:
         # writes to. Constructing one here is a fallback for standalone use.
         self.vectorstore_service = vectorstore_service or VectorStoreService()
         self.retriever = self.vectorstore_service.get_retriever()
-        
-        self.qa_prompt = PromptTemplate(
-            template=RAG_PROMPT_TEMPLATE,
-            input_variables=["context", "question"]
-        )
-        
-        self.condense_prompt = PromptTemplate(
-            template=CONDENSE_QUESTION_TEMPLATE,
-            input_variables=["chat_history", "question"]
-        )
 
         # No memory object: the client sends the history with each request, so
         # the chain stays stateless and one agent can serve every caller.
         self.chain = ConversationalRetrievalChain.from_llm(
             llm=self.llm,
             retriever=self.retriever,
-            combine_docs_chain_kwargs={"prompt": self.qa_prompt},
-            condense_question_prompt=self.condense_prompt,
-            return_source_documents=True,
-            verbose=False
+            combine_docs_chain_kwargs={"prompt": PromptTemplate.from_template(RAG_PROMPT_TEMPLATE)},
+            condense_question_prompt=PromptTemplate.from_template(CONDENSE_QUESTION_TEMPLATE),
+            return_source_documents=True
         )
     
     def query(self, question: str, conversation_history: Optional[List[Dict]] = None) -> Dict:
@@ -77,18 +66,15 @@ class RAGAgent:
             ]
             result = self.chain({"question": question, "chat_history": chat_history})
             
-            sources = []
-            for doc in result.get("source_documents", []):
-                sources.append({
+            sources = [
+                {
                     "content": doc.page_content[:200] + "...",
                     "page": doc.metadata.get("page", "N/A"),
                     "source": doc.metadata.get("source", "Unknown")
-                })
-            
-            return {
-                "answer": result["answer"],
-                "sources": sources
-            }
+                }
+                for doc in result.get("source_documents", [])
+            ]
+            return {"answer": result["answer"], "sources": sources}
         
         except ResourceExhausted as e:
             # Google's message names the quota that ran out (per minute or per day).
