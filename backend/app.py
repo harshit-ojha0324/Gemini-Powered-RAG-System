@@ -238,34 +238,26 @@ def query_documents(request: QueryRequest):
 @app.get("/api/documents")
 def list_documents():
     """List all uploaded documents"""
-    try:
-        documents = [
-            {
-                "filename": f.name,
-                "size": f.stat().st_size,
-                "uploaded_at": datetime.fromtimestamp(f.stat().st_mtime).isoformat()
-            }
-            for f in pdf_files()
-        ]
-        return {"documents": documents, "count": len(documents)}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    documents = [
+        {
+            "filename": f.name,
+            "size": f.stat().st_size,
+            "uploaded_at": datetime.fromtimestamp(f.stat().st_mtime).isoformat()
+        }
+        for f in pdf_files()
+    ]
+    return {"documents": documents, "count": len(documents)}
 
 @app.delete("/api/documents/{filename}")
 def delete_document(filename: str):
     """Delete a document"""
-    try:
-        file_path = resolve_document_path(filename)
-        with index_lock:
-            if not file_path.exists():
-                raise HTTPException(status_code=404, detail="Document not found")
-            file_path.unlink()
-            vectorstore_service.delete_document(file_path.name)
-        return {"message": "Document deleted successfully"}
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    file_path = resolve_document_path(filename)
+    with index_lock:
+        if not file_path.exists():
+            raise HTTPException(status_code=404, detail="Document not found")
+        file_path.unlink()
+        vectorstore_service.delete_document(file_path.name)
+    return {"message": "Document deleted successfully"}
 
 @app.get("/api/stats")
 def get_statistics():
@@ -278,15 +270,11 @@ def get_statistics():
 @app.get("/api/security/logs")
 def get_security_logs(limit: int = Query(50, ge=1)):
     """Get the most recent security logs, newest first"""
-    try:
-        if not LOG_FILE.exists():
-            return {"logs": [], "count": 0}
-
-        with open(LOG_FILE) as f:
-            logs = [json.loads(line) for line in deque(f, maxlen=limit)][::-1]
-        return {"logs": logs, "count": len(logs)}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    if not LOG_FILE.exists():
+        return {"logs": [], "count": 0}
+    with open(LOG_FILE) as f:
+        logs = [json.loads(line) for line in deque(f, maxlen=limit)][::-1]
+    return {"logs": logs, "count": len(logs)}
 
 @app.get("/api/health")
 async def health_check():

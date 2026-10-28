@@ -24,20 +24,16 @@ class VectorStoreService:
     
     def add_documents(self, documents: List[Document], source: str) -> None:
         """Index a document's chunks, replacing any previously indexed version"""
-        try:
-            for doc in documents:
-                doc.metadata["source"] = source
+        for doc in documents:
+            doc.metadata["source"] = source
 
-            # Old chunks go only after the new ones are in, so a failed
-            # re-index leaves the previous version searchable.
-            old_ids = self.vectorstore.get(where={"source": source})["ids"]
-            self.vectorstore.add_documents(documents)
-            if old_ids:
-                self.vectorstore.delete(ids=old_ids)
-            self.vectorstore.persist()
-        
-        except Exception as e:
-            raise Exception(f"Error adding documents: {str(e)}")
+        # Old chunks go only after the new ones are in, so a failed
+        # re-index leaves the previous version searchable.
+        old_ids = self.vectorstore.get(where={"source": source})["ids"]
+        self.vectorstore.add_documents(documents)
+        if old_ids:
+            self.vectorstore.delete(ids=old_ids)
+        self.vectorstore.persist()
     
     def indexed_sources(self) -> Set[str]:
         """Names of the documents that have chunks in this model's collection"""
@@ -51,11 +47,8 @@ class VectorStoreService:
         )
     
     def delete_document(self, source: str):
-        """Delete documents by source"""
-        try:
-            results = self.vectorstore.get(where={"source": source})
-            if results and results['ids']:
-                self.vectorstore.delete(ids=results['ids'])
-                self.vectorstore.persist()
-        except Exception as e:
-            raise Exception(f"Error deleting documents: {str(e)}")
+        """Delete a document's chunks"""
+        ids = self.vectorstore.get(where={"source": source})["ids"]
+        if ids:
+            self.vectorstore.delete(ids=ids)
+            self.vectorstore.persist()

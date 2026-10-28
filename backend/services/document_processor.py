@@ -1,5 +1,4 @@
 import logging
-import os
 import re
 import math
 import statistics
@@ -108,26 +107,10 @@ class DocumentProcessor:
 
     def process_pdf(self, file_path: str) -> List[Document]:
         """Process a PDF file and return semantically-chunked document pieces."""
-        try:
-            reader = PdfReader(file_path)
-            documents = []
-
-            for page_num, page in enumerate(reader.pages):
-                text = page.extract_text()
-
-                if text and text.strip():
-                    doc = Document(
-                        page_content=text,
-                        metadata={
-                            "source": os.path.basename(file_path),
-                            "page": page_num + 1,
-                            "total_pages": len(reader.pages)
-                        }
-                    )
-                    documents.append(doc)
-
-            chunks = self.text_splitter.split_documents(documents)
-            return chunks
-
-        except Exception as e:
-            raise Exception(f"Error processing PDF: {str(e)}")
+        # The caller stamps each chunk's "source" when it indexes them.
+        documents = [
+            Document(page_content=text, metadata={"page": page_num})
+            for page_num, page in enumerate(PdfReader(file_path).pages, 1)
+            if (text := page.extract_text()) and text.strip()
+        ]
+        return self.text_splitter.split_documents(documents)
